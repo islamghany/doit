@@ -62,9 +62,9 @@ type AppConfig struct {
 	LogLevel    string `env:"LOG_LEVEL" flag:"log_level" default:"info"`
 }
 type Config struct {
-	Server ServerConfig `prefix:"SERVER_"`
-	App    AppConfig    `prefix:"APP_"`
-	// Database DatabaseConfig `prefix:"DB_"`
+	Server   ServerConfig   `prefix:"SERVER_"`
+	App      AppConfig      `prefix:"APP_"`
+	Database DatabaseConfig `prefix:"DB_"`
 	// JWT      JWTConfig      `prefix:"JWT_"`
 	// Redis    RedisConfig    `prefix:"REDIS_"`
 }

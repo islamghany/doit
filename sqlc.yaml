@@ -1,0 +1,33 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "./internal/data/queries"
+    schema: "./internal/data/migrations"
+    gen:
+      go:
+        package: "db"
+        out: "./internal/data/db"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_db_tags: true
+        emit_prepared_queries: true
+        emit_interface: true
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        overrides:
+          # Use pgtype for advanced PostgreSQL types
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "jsonb"
+            go_type: "json.RawMessage"
+            go_struct_tag: 'json:"{{.Name}}"'
+        rename:
+          id: "ID"
+          user_id: "UserID"
+          created_at: "CreatedAt"
+          updated_at: "UpdatedAt"
+          deleted_at: "DeletedAt"
+
