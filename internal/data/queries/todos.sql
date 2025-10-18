@@ -15,20 +15,17 @@ RETURNING *;
 -- name: GetTodoByID :one
 SELECT *
 FROM todos
-WHERE id = $1
-    AND deleted_at IS NULL;
+WHERE id = $1;
 -- name: GetTodoByIDForUpdate :one
 -- Use FOR UPDATE to lock the row for updates (prevents race conditions)
 SELECT *
 FROM todos
-WHERE id = $1
-    AND deleted_at IS NULL FOR
+WHERE id = $1 FOR
 UPDATE;
 -- name: ListTodosByUser :many
 SELECT *
 FROM todos
 WHERE user_id = $1
-    AND deleted_at IS NULL
 ORDER BY CASE
         priority
         WHEN 'urgent' THEN 1
@@ -43,7 +40,6 @@ SELECT *
 FROM todos
 WHERE user_id = $1
     AND status = $2
-    AND deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT $3 OFFSET $4;
 -- name: UpdateTodo :one
@@ -56,32 +52,23 @@ SET title = COALESCE(sqlc.narg('title'), title),
     metadata = COALESCE(sqlc.narg('metadata'), metadata),
     due_date = COALESCE(sqlc.narg('due_date'), due_date)
 WHERE id = sqlc.arg('id')
-    AND deleted_at IS NULL
 RETURNING *;
 -- name: CompleteTodo :one
 UPDATE todos
 SET status = 'completed',
     completed_at = NOW()
 WHERE id = $1
-    AND deleted_at IS NULL
     AND status != 'completed'
 RETURNING *;
--- name: SoftDeleteTodo :exec
-UPDATE todos
-SET deleted_at = NOW()
-WHERE id = $1
-    AND deleted_at IS NULL;
 -- name: CountUserTodos :one
 SELECT COUNT(*)
 FROM todos
-WHERE user_id = $1
-    AND deleted_at IS NULL;
+WHERE user_id = $1;
 -- name: CountUserTodosByStatus :one
 SELECT COUNT(*)
 FROM todos
 WHERE user_id = $1
-    AND status = $2
-    AND deleted_at IS NULL;
+    AND status = $2;
 -- name: GetOverdueTodos :many
 SELECT t.*,
     u.email as user_email
@@ -89,7 +76,6 @@ FROM todos t
     JOIN users u ON t.user_id = u.id
 WHERE t.due_date < NOW()
     AND t.status != 'completed'
-    AND t.deleted_at IS NULL
 ORDER BY t.due_date ASC
 LIMIT $1;
 -- name: SearchTodosByTitle :many
@@ -97,7 +83,6 @@ SELECT *
 FROM todos
 WHERE user_id = $1
     AND title ILIKE '%' || $2 || '%'
-    AND deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT $3;
 -- name: GetTodosByTags :many
@@ -105,19 +90,11 @@ SELECT *
 FROM todos
 WHERE user_id = $1
     AND tags && $2::text []
-    AND deleted_at IS NULL
 ORDER BY created_at DESC;
 -- name: BulkUpdateTodoStatus :exec
 UPDATE todos
 SET status = $2
-WHERE id = ANY($1::uuid [])
-    AND deleted_at IS NULL;
--- name: BulkDeleteTodos :exec
-UPDATE todos
-SET deleted_at = NOW()
-WHERE id = ANY($1::uuid [])
-    AND user_id = $2
-    AND deleted_at IS NULL;
+WHERE id = ANY($1::uuid []);
 -- name: GetTodoStats :one
 SELECT COUNT(*) as total,
     COUNT(*) FILTER (
@@ -134,5 +111,12 @@ SELECT COUNT(*) as total,
             AND status != 'completed'
     ) as overdue
 FROM todos
-WHERE user_id = $1
-    AND deleted_at IS NULL;
+WHERE user_id = $1;
+-- name: HardDeleteTodo :exec
+DELETE FROM todos
+WHERE id = $1
+    AND user_id = $2;
+-- name: HardDeleteTodos :exec
+DELETE FROM todos
+WHERE id = ANY($1::uuid [])
+    AND user_id = $2;

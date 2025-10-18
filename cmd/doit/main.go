@@ -25,6 +25,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	cfg.DevPrint()
+
 	// Setup logger
 	log := setupLogger(cfg)
 
@@ -35,7 +37,6 @@ func main() {
 		"environment", cfg.App.Environment,
 	)
 
-	fmt.Println("cfg", cfg)
 	if err := api.Run(ctx, log, cfg); err != nil {
 		log.Error(ctx, "Failed to start the application.", "error", err)
 		os.Exit(1)

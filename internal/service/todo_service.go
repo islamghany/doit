@@ -234,15 +234,6 @@ func (s *TodoService) CompleteTodo(ctx context.Context, todoID uuid.UUID, userID
 	return s.toTodoModel(todo), nil
 }
 
-// DeleteTodo soft deletes a todo
-func (s *TodoService) DeleteTodo(ctx context.Context, todoID uuid.UUID) error {
-	err := s.queries.SoftDeleteTodo(ctx, todoID)
-	if err != nil {
-		return fmt.Errorf("failed to delete todo: %w", err)
-	}
-	return nil
-}
-
 // BulkCompleteTodos completes multiple todos
 func (s *TodoService) BulkCompleteTodos(ctx context.Context, todoIDs []uuid.UUID) error {
 	return database.WithTransaction(ctx, s.pool.Pool, database.DefaultTxOptions(), func(tx pgx.Tx) error {
@@ -262,12 +253,23 @@ func (s *TodoService) BulkCompleteTodos(ctx context.Context, todoIDs []uuid.UUID
 
 // BulkDeleteTodos deletes multiple todos
 func (s *TodoService) BulkDeleteTodos(ctx context.Context, todoIDs []uuid.UUID, userID uuid.UUID) error {
-	err := s.queries.BulkDeleteTodos(ctx, db.BulkDeleteTodosParams{
+	err := s.queries.HardDeleteTodos(ctx, db.HardDeleteTodosParams{
 		Column1: todoIDs,
 		UserID:  userID,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to bulk delete todos: %w", err)
+		return fmt.Errorf("failed to hard delete todos: %w", err)
+	}
+	return nil
+}
+
+func (s *TodoService) DeleteTodo(ctx context.Context, todoID uuid.UUID, userID uuid.UUID) error {
+	err := s.queries.HardDeleteTodo(ctx, db.HardDeleteTodoParams{
+		ID:     todoID,
+		UserID: userID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to hard delete todo: %w", err)
 	}
 	return nil
 }

@@ -3,11 +3,12 @@ package api
 import (
 	"doit/internal/config"
 	"doit/internal/web"
+	"doit/pkg/database"
 	"doit/pkg/logger"
 	"net/http"
 )
 
-func NewServer(logger *logger.Logger, cfg *config.Config) http.Handler {
+func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool) http.Handler {
 	app := web.NewApp()
 
 	app.Handle("GET", "/healthcheck", func(w http.ResponseWriter, r *http.Request) error {

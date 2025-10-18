@@ -11,22 +11,18 @@ RETURNING *;
 -- name: GetUserByID :one
 SELECT *
 FROM users
-WHERE id = $1
-    AND deleted_at IS NULL;
+WHERE id = $1;
 -- name: GetUserByEmail :one
 SELECT *
 FROM users
-WHERE email = $1
-    AND deleted_at IS NULL;
+WHERE email = $1;
 -- name: GetUserByUsername :one
 SELECT *
 FROM users
-WHERE username = $1
-    AND deleted_at IS NULL;
+WHERE username = $1;
 -- name: ListUsers :many
 SELECT *
 FROM users
-WHERE deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 -- name: UpdateUser :one
@@ -36,13 +32,11 @@ SET email = COALESCE(sqlc.narg('email'), email),
     is_active = COALESCE(sqlc.narg('is_active'), is_active),
     metadata = COALESCE(sqlc.narg('metadata'), metadata)
 WHERE id = $1
-    AND deleted_at IS NULL
 RETURNING *;
 -- name: UpdateUserPassword :exec
 UPDATE users
 SET password_hash = $2
-WHERE id = $1
-    AND deleted_at IS NULL;
+WHERE id = $1;
 -- name: UpdateUserLastLogin :exec
 UPDATE users
 SET last_login_at = NOW()
@@ -50,26 +44,17 @@ WHERE id = $1;
 -- name: VerifyUserEmail :exec
 UPDATE users
 SET email_verified = TRUE
-WHERE id = $1
-    AND deleted_at IS NULL;
--- name: SoftDeleteUser :exec
-UPDATE users
-SET deleted_at = NOW()
-WHERE id = $1
-    AND deleted_at IS NULL;
+WHERE id = $1;
 -- name: CountUsers :one
 SELECT COUNT(*)
-FROM users
-WHERE deleted_at IS NULL;
+FROM users;
 -- name: SearchUsersByEmail :many
 SELECT *
 FROM users
 WHERE email ILIKE '%' || $1 || '%'
-    AND deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT $2;
 -- name: BulkUpdateUsersMetadata :exec
 UPDATE users
 SET metadata = metadata || $2::jsonb
-WHERE id = ANY($1::uuid [])
-    AND deleted_at IS NULL;
+WHERE id = ANY($1::uuid []);

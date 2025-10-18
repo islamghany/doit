@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"doit/internal/config"
+	"doit/pkg/database"
 	"doit/pkg/logger"
 	"fmt"
 	"net/http"
@@ -14,8 +15,32 @@ import (
 
 func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
 
+	// Initialize database
+	dbPool, err := database.New(ctx, database.Config{
+		Host:            cfg.Database.Host,
+		Port:            cfg.Database.Port,
+		Database:        cfg.Database.Name,
+		User:            cfg.Database.User,
+		Password:        cfg.Database.Password,
+		MaxConns:        cfg.Database.MaxOpenConns,
+		MinConns:        5,
+		MaxConnLifetime: time.Duration(cfg.Database.ConnMaxLifetime) * time.Second,
+		MaxConnIdleTime: 30 * time.Minute,
+		DisableTLS:      cfg.Database.DisableTLS,
+		LogLevel:        cfg.App.LogLevel,
+	})
+	if err != nil {
+		logger.Error(ctx, "Failed to connect to database", "error", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+	logger.Info(ctx, "Database connection established",
+		"host", cfg.Database.Host,
+		"database", cfg.Database.Name,
+	)
+	defer dbPool.Close()
+
 	// Starting the HTTP server with graceful shutdown
-	srv := NewServer(logger, cfg)
+	srv := NewServer(logger, cfg, dbPool)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

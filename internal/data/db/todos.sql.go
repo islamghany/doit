@@ -13,29 +13,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const bulkDeleteTodos = `-- name: BulkDeleteTodos :exec
-UPDATE todos
-SET deleted_at = NOW()
-WHERE id = ANY($1::uuid [])
-    AND user_id = $2
-    AND deleted_at IS NULL
-`
-
-type BulkDeleteTodosParams struct {
-	Column1 []uuid.UUID `db:"column_1" json:"column_1"`
-	UserID  uuid.UUID   `db:"user_id" json:"user_id"`
-}
-
-func (q *Queries) BulkDeleteTodos(ctx context.Context, arg BulkDeleteTodosParams) error {
-	_, err := q.db.Exec(ctx, bulkDeleteTodos, arg.Column1, arg.UserID)
-	return err
-}
-
 const bulkUpdateTodoStatus = `-- name: BulkUpdateTodoStatus :exec
 UPDATE todos
 SET status = $2
 WHERE id = ANY($1::uuid [])
-    AND deleted_at IS NULL
 `
 
 type BulkUpdateTodoStatusParams struct {
@@ -53,7 +34,6 @@ UPDATE todos
 SET status = 'completed',
     completed_at = NOW()
 WHERE id = $1
-    AND deleted_at IS NULL
     AND status != 'completed'
 RETURNING id, user_id, title, description, status, priority, tags, metadata, due_date, completed_at, created_at, updated_at
 `
@@ -82,7 +62,6 @@ const countUserTodos = `-- name: CountUserTodos :one
 SELECT COUNT(*)
 FROM todos
 WHERE user_id = $1
-    AND deleted_at IS NULL
 `
 
 func (q *Queries) CountUserTodos(ctx context.Context, userID uuid.UUID) (int64, error) {
@@ -97,7 +76,6 @@ SELECT COUNT(*)
 FROM todos
 WHERE user_id = $1
     AND status = $2
-    AND deleted_at IS NULL
 `
 
 type CountUserTodosByStatusParams struct {
@@ -177,7 +155,6 @@ FROM todos t
     JOIN users u ON t.user_id = u.id
 WHERE t.due_date < NOW()
     AND t.status != 'completed'
-    AND t.deleted_at IS NULL
 ORDER BY t.due_date ASC
 LIMIT $1
 `
@@ -236,7 +213,6 @@ const getTodoByID = `-- name: GetTodoByID :one
 SELECT id, user_id, title, description, status, priority, tags, metadata, due_date, completed_at, created_at, updated_at
 FROM todos
 WHERE id = $1
-    AND deleted_at IS NULL
 `
 
 func (q *Queries) GetTodoByID(ctx context.Context, id uuid.UUID) (Todo, error) {
@@ -262,8 +238,7 @@ func (q *Queries) GetTodoByID(ctx context.Context, id uuid.UUID) (Todo, error) {
 const getTodoByIDForUpdate = `-- name: GetTodoByIDForUpdate :one
 SELECT id, user_id, title, description, status, priority, tags, metadata, due_date, completed_at, created_at, updated_at
 FROM todos
-WHERE id = $1
-    AND deleted_at IS NULL FOR
+WHERE id = $1 FOR
 UPDATE
 `
 
@@ -305,7 +280,6 @@ SELECT COUNT(*) as total,
     ) as overdue
 FROM todos
 WHERE user_id = $1
-    AND deleted_at IS NULL
 `
 
 type GetTodoStatsRow struct {
@@ -334,7 +308,6 @@ SELECT id, user_id, title, description, status, priority, tags, metadata, due_da
 FROM todos
 WHERE user_id = $1
     AND tags && $2::text []
-    AND deleted_at IS NULL
 ORDER BY created_at DESC
 `
 
@@ -376,11 +349,42 @@ func (q *Queries) GetTodosByTags(ctx context.Context, arg GetTodosByTagsParams) 
 	return items, nil
 }
 
+const hardDeleteTodo = `-- name: HardDeleteTodo :exec
+DELETE FROM todos
+WHERE id = $1
+    AND user_id = $2
+`
+
+type HardDeleteTodoParams struct {
+	ID     uuid.UUID `db:"id" json:"id"`
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+}
+
+func (q *Queries) HardDeleteTodo(ctx context.Context, arg HardDeleteTodoParams) error {
+	_, err := q.db.Exec(ctx, hardDeleteTodo, arg.ID, arg.UserID)
+	return err
+}
+
+const hardDeleteTodos = `-- name: HardDeleteTodos :exec
+DELETE FROM todos
+WHERE id = ANY($1::uuid [])
+    AND user_id = $2
+`
+
+type HardDeleteTodosParams struct {
+	Column1 []uuid.UUID `db:"column_1" json:"column_1"`
+	UserID  uuid.UUID   `db:"user_id" json:"user_id"`
+}
+
+func (q *Queries) HardDeleteTodos(ctx context.Context, arg HardDeleteTodosParams) error {
+	_, err := q.db.Exec(ctx, hardDeleteTodos, arg.Column1, arg.UserID)
+	return err
+}
+
 const listTodosByUser = `-- name: ListTodosByUser :many
 SELECT id, user_id, title, description, status, priority, tags, metadata, due_date, completed_at, created_at, updated_at
 FROM todos
 WHERE user_id = $1
-    AND deleted_at IS NULL
 ORDER BY CASE
         priority
         WHEN 'urgent' THEN 1
@@ -436,7 +440,6 @@ SELECT id, user_id, title, description, status, priority, tags, metadata, due_da
 FROM todos
 WHERE user_id = $1
     AND status = $2
-    AND deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT $3 OFFSET $4
 `
@@ -491,7 +494,6 @@ SELECT id, user_id, title, description, status, priority, tags, metadata, due_da
 FROM todos
 WHERE user_id = $1
     AND title ILIKE '%' || $2 || '%'
-    AND deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT $3
 `
@@ -535,18 +537,6 @@ func (q *Queries) SearchTodosByTitle(ctx context.Context, arg SearchTodosByTitle
 	return items, nil
 }
 
-const softDeleteTodo = `-- name: SoftDeleteTodo :exec
-UPDATE todos
-SET deleted_at = NOW()
-WHERE id = $1
-    AND deleted_at IS NULL
-`
-
-func (q *Queries) SoftDeleteTodo(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, softDeleteTodo, id)
-	return err
-}
-
 const updateTodo = `-- name: UpdateTodo :one
 UPDATE todos
 SET title = COALESCE($1, title),
@@ -557,7 +547,6 @@ SET title = COALESCE($1, title),
     metadata = COALESCE($6, metadata),
     due_date = COALESCE($7, due_date)
 WHERE id = $8
-    AND deleted_at IS NULL
 RETURNING id, user_id, title, description, status, priority, tags, metadata, due_date, completed_at, created_at, updated_at
 `
 

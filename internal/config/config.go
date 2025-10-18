@@ -111,6 +111,14 @@ func (c *Config) IsProduction() bool {
 	return c.App.Environment == "production"
 }
 
+func (c *Config) DevPrint() {
+	if c.IsDevelopment() {
+		// Print the config in a pretty format
+		fmt.Printf("%+v", c)
+	}
+
+}
+
 func LoadConfig() (*Config, error) {
 	var cfg Config
 	if err := enfl.Load(&cfg); err != nil {

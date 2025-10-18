@@ -11,7 +11,6 @@ import (
 )
 
 type Querier interface {
-	BulkDeleteTodos(ctx context.Context, arg BulkDeleteTodosParams) error
 	BulkUpdateTodoStatus(ctx context.Context, arg BulkUpdateTodoStatusParams) error
 	BulkUpdateUsersMetadata(ctx context.Context, arg BulkUpdateUsersMetadataParams) error
 	CompleteTodo(ctx context.Context, id uuid.UUID) (Todo, error)
@@ -29,13 +28,13 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	HardDeleteTodo(ctx context.Context, arg HardDeleteTodoParams) error
+	HardDeleteTodos(ctx context.Context, arg HardDeleteTodosParams) error
 	ListTodosByUser(ctx context.Context, arg ListTodosByUserParams) ([]Todo, error)
 	ListTodosByUserAndStatus(ctx context.Context, arg ListTodosByUserAndStatusParams) ([]Todo, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	SearchTodosByTitle(ctx context.Context, arg SearchTodosByTitleParams) ([]Todo, error)
 	SearchUsersByEmail(ctx context.Context, arg SearchUsersByEmailParams) ([]User, error)
-	SoftDeleteTodo(ctx context.Context, id uuid.UUID) error
-	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
 	UpdateTodo(ctx context.Context, arg UpdateTodoParams) (Todo, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserLastLogin(ctx context.Context, id uuid.UUID) error

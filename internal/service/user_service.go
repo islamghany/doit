@@ -191,15 +191,6 @@ func (s *UserService) VerifyUserEmail(ctx context.Context, userID uuid.UUID) err
 	return nil
 }
 
-// DeleteUser soft deletes a user
-func (s *UserService) DeleteUser(ctx context.Context, userID uuid.UUID) error {
-	err := s.queries.SoftDeleteUser(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("failed to delete user: %w", err)
-	}
-	return nil
-}
-
 // ListUsers retrieves paginated list of users
 func (s *UserService) ListUsers(ctx context.Context, filter model.UserFilter) ([]*model.User, error) {
 	// If email filter is provided, use search

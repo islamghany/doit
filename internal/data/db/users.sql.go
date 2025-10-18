@@ -16,7 +16,6 @@ const bulkUpdateUsersMetadata = `-- name: BulkUpdateUsersMetadata :exec
 UPDATE users
 SET metadata = metadata || $2::jsonb
 WHERE id = ANY($1::uuid [])
-    AND deleted_at IS NULL
 `
 
 type BulkUpdateUsersMetadataParams struct {
@@ -32,7 +31,6 @@ func (q *Queries) BulkUpdateUsersMetadata(ctx context.Context, arg BulkUpdateUse
 const countUsers = `-- name: CountUsers :one
 SELECT COUNT(*)
 FROM users
-WHERE deleted_at IS NULL
 `
 
 func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
@@ -90,7 +88,6 @@ const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, username, password_hash, email_verified, is_active, metadata, last_login_at, created_at, updated_at
 FROM users
 WHERE email = $1
-    AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -115,7 +112,6 @@ const getUserByID = `-- name: GetUserByID :one
 SELECT id, email, username, password_hash, email_verified, is_active, metadata, last_login_at, created_at, updated_at
 FROM users
 WHERE id = $1
-    AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -140,7 +136,6 @@ const getUserByUsername = `-- name: GetUserByUsername :one
 SELECT id, email, username, password_hash, email_verified, is_active, metadata, last_login_at, created_at, updated_at
 FROM users
 WHERE username = $1
-    AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -164,7 +159,6 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 const listUsers = `-- name: ListUsers :many
 SELECT id, email, username, password_hash, email_verified, is_active, metadata, last_login_at, created_at, updated_at
 FROM users
-WHERE deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -209,7 +203,6 @@ const searchUsersByEmail = `-- name: SearchUsersByEmail :many
 SELECT id, email, username, password_hash, email_verified, is_active, metadata, last_login_at, created_at, updated_at
 FROM users
 WHERE email ILIKE '%' || $1 || '%'
-    AND deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT $2
 `
@@ -250,18 +243,6 @@ func (q *Queries) SearchUsersByEmail(ctx context.Context, arg SearchUsersByEmail
 	return items, nil
 }
 
-const softDeleteUser = `-- name: SoftDeleteUser :exec
-UPDATE users
-SET deleted_at = NOW()
-WHERE id = $1
-    AND deleted_at IS NULL
-`
-
-func (q *Queries) SoftDeleteUser(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, softDeleteUser, id)
-	return err
-}
-
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET email = COALESCE($2, email),
@@ -269,7 +250,6 @@ SET email = COALESCE($2, email),
     is_active = COALESCE($4, is_active),
     metadata = COALESCE($5, metadata)
 WHERE id = $1
-    AND deleted_at IS NULL
 RETURNING id, email, username, password_hash, email_verified, is_active, metadata, last_login_at, created_at, updated_at
 `
 
@@ -320,7 +300,6 @@ const updateUserPassword = `-- name: UpdateUserPassword :exec
 UPDATE users
 SET password_hash = $2
 WHERE id = $1
-    AND deleted_at IS NULL
 `
 
 type UpdateUserPasswordParams struct {
@@ -337,7 +316,6 @@ const verifyUserEmail = `-- name: VerifyUserEmail :exec
 UPDATE users
 SET email_verified = TRUE
 WHERE id = $1
-    AND deleted_at IS NULL
 `
 
 func (q *Queries) VerifyUserEmail(ctx context.Context, id uuid.UUID) error {
