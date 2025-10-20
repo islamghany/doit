@@ -238,6 +238,256 @@ docker exec -i doit_db psql -U islamghany doit < backup_20231018_120000.sql
 
 ---
 
+## Database Seeding
+
+### Overview
+
+The project includes a flexible seeding system for populating your database with test data. Seeds are separate from migrations:
+
+- **Migrations** = Schema structure (tables, indexes, constraints)
+- **Seeds** = Test/development data (users, todos, etc.)
+
+### Directory Structure
+
+```
+internal/data/seeder/
+├── seeder.go              # Seeding logic
+└── seeds/                 # SQL seed files
+    ├── 001_dev_users.sql
+    └── 002_dev_todos.sql
+```
+
+### Seed Files
+
+Seed files are named with environment prefixes:
+
+- `*_dev_*.sql` - Development environment
+- `*_test_*.sql` - Testing environment
+- `*_staging_*.sql` - Staging environment
+- No prefix - Runs in all environments
+
+**Example: `seeds/001_dev_users.sql`**
+
+```sql
+-- Insert test users (idempotent with ON CONFLICT)
+INSERT INTO users (id, email, username, password_hash, email_verified, is_active)
+VALUES
+  ('550e8400-e29b-41d4-a716-446655440000', 'admin@example.com', 'admin', '$2a$10$...', true, true),
+  ('550e8400-e29b-41d4-a716-446655440001', 'user@example.com', 'user', '$2a$10$...', true, true)
+ON CONFLICT (email) DO NOTHING;
+```
+
+### Running Seeds
+
+```bash
+# Seed with dev data
+make seed-dev
+
+# Seed with test data
+make seed-test
+
+# Seed with all data (no environment filter)
+make seed
+
+# Full setup (migrations + seeds)
+make setup
+```
+
+### Makefile Commands
+
+Add these to your development workflow:
+
+```makefile
+# Complete setup from scratch
+make dev-db          # Start database
+make migrate-up      # Run migrations
+make seed-dev        # Populate with dev data
+
+# Or use the convenience command:
+make setup           # Does all of the above
+```
+
+### Best Practices for Seeding
+
+#### 1. Make Seeds Idempotent
+
+Always use `ON CONFLICT DO NOTHING` or `ON CONFLICT DO UPDATE`:
+
+```sql
+-- ✅ Good: Can run multiple times safely
+INSERT INTO users (email, username, password_hash)
+VALUES ('admin@example.com', 'admin', '$2a$10$...')
+ON CONFLICT (email) DO NOTHING;
+
+-- ❌ Bad: Fails on duplicate key
+INSERT INTO users (email, username, password_hash)
+VALUES ('admin@example.com', 'admin', '$2a$10$...');
+```
+
+#### 2. Use Fixed UUIDs for Test Data
+
+Use predictable UUIDs for easier testing:
+
+```sql
+INSERT INTO users (id, email, username, password_hash)
+VALUES
+  ('550e8400-e29b-41d4-a716-446655440000', 'admin@example.com', 'admin', '$2a$10$...'),
+  ('550e8400-e29b-41d4-a716-446655440001', 'user@example.com', 'user', '$2a$10$...')
+ON CONFLICT (id) DO NOTHING;
+```
+
+#### 3. Order Matters
+
+Seed files run in alphabetical order. Use numeric prefixes:
+
+```
+001_dev_users.sql      # First (no dependencies)
+002_dev_todos.sql      # Second (depends on users)
+003_dev_comments.sql   # Third (depends on todos)
+```
+
+#### 4. Environment-Specific Data
+
+```sql
+-- 001_dev_users.sql (development only)
+-- Large dataset for local testing
+INSERT INTO users ... -- 100 test users
+
+-- 001_test_users.sql (CI/testing only)
+-- Minimal dataset for fast tests
+INSERT INTO users ... -- 3 test users
+
+-- 001_staging_users.sql (staging only)
+-- Production-like data
+INSERT INTO users ... -- Realistic sample data
+```
+
+#### 5. Hash Passwords Properly
+
+**Never** seed with plaintext passwords:
+
+```sql
+-- ✅ Good: Pre-hashed password (bcrypt)
+INSERT INTO users (email, password_hash)
+VALUES ('admin@example.com', '$2a$10$YqgY5R5Z...');
+
+-- ❌ Bad: Plaintext password
+INSERT INTO users (email, password)
+VALUES ('admin@example.com', 'password123');
+```
+
+Generate bcrypt hashes:
+
+```bash
+# Using Go
+go run -ldflags="-s -w" <(cat <<'EOF'
+package main
+import ("fmt"; "golang.org/x/crypto/bcrypt")
+func main() {
+  hash, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+  fmt.Println(string(hash))
+}
+EOF
+)
+```
+
+#### 6. Never Seed Production
+
+```sql
+-- Good: Environment check in code
+if config.Environment != "production" {
+    seeder.Run(ctx, "dev")
+}
+
+-- Or use environment-specific seed files
+-- Production should only use migrations
+```
+
+### Seeding Workflow
+
+#### Development Setup
+
+```bash
+# Fresh start
+make dev-db-stop     # Stop existing DB
+make dev-db          # Start fresh DB
+make migrate-up      # Create schema
+make seed-dev        # Populate data
+make run             # Start app
+```
+
+#### Testing Setup
+
+```bash
+# In your test setup
+make migrate-up
+make seed-test
+go test ./...
+```
+
+#### CI/CD Pipeline
+
+```yaml
+# .github/workflows/test.yml
+- name: Setup Database
+  run: |
+    docker-compose up -d postgres
+    make migrate-up
+    make seed-test
+
+- name: Run Tests
+  run: go test -v ./...
+```
+
+### Advanced: Programmatic Seeding
+
+For complex seed data, you can add Go-based seeders:
+
+```go
+// internal/data/seeder/user_seeder.go
+func (s *Seeder) SeedUsers(ctx context.Context, count int) error {
+    for i := 0; i < count; i++ {
+        user := generateRandomUser()
+        _, err := s.pool.Exec(ctx,
+            "INSERT INTO users (email, username, password_hash) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+            user.Email, user.Username, user.PasswordHash,
+        )
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+### Troubleshooting Seeds
+
+#### Seed File Not Found
+
+```bash
+# Error: no matching files found
+```
+
+**Solution:** Ensure seed files are in `internal/data/seeder/seeds/` (relative to the seeder package).
+
+#### Foreign Key Violations
+
+```bash
+# Error: violates foreign key constraint
+```
+
+**Solution:** Seed in dependency order (parent tables before child tables).
+
+#### Duplicate Data
+
+```bash
+# Error: duplicate key value violates unique constraint
+```
+
+**Solution:** Use `ON CONFLICT DO NOTHING` in your INSERT statements.
+
+---
+
 ## Common Scenarios & Solutions
 
 ### Scenario 1: Migration Fails Partway

@@ -24,6 +24,13 @@ help:
 	@echo "  db-check       - Check database connection"
 	@echo "  db-tables      - Show all database tables"
 	@echo ""
+	@echo "🌱 Database Seeding:"
+	@echo "  seed           - Run all seed files"
+	@echo "  seed-dev       - Run development seed files only"
+	@echo "  seed-test      - Run test seed files only"
+	@echo "  setup          - Complete setup (database + migrations + seeds)"
+	@echo "  dev            - Full dev workflow (setup + run)"
+	@echo ""
 	@echo "📦 Code Generation:"
 	@echo "  sqlc           - Generate sqlc code"
 	@echo ""
@@ -149,3 +156,20 @@ dev-db:
 dev-db-stop:
 	docker stop doit-postgres || true
 	docker rm doit-postgres || true
+
+# Database seeding
+seed:
+	go run ./cmd/seed/main.go
+
+seed-dev:
+	go run ./cmd/seed/main.go --env=dev
+
+seed-test:
+	go run ./cmd/seed/main.go --env=test
+
+# Complete setup (database, migrations, seeds)
+setup: dev-db migrate-up seed-dev
+	@echo "✅ Database setup complete!"
+
+# Development workflow
+dev: setup run
