@@ -20,7 +20,7 @@ func TestConnectWithRetry_Success(t *testing.T) {
 	conn, err := ConnectWithRetry(context.Background(), cfg,
 		func(ctx context.Context) (*mockConnection, error) {
 			attempts++
-			return &mockConnection{id: "conn-1"}, nil
+			return &mockConnection{id: "conn-2"}, nil
 		},
 	)
 
