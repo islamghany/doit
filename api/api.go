@@ -5,6 +5,7 @@ import (
 	"doit/internal/config"
 	"doit/pkg/database"
 	"doit/pkg/logger"
+	"doit/pkg/retry"
 	"fmt"
 	"net/http"
 	"os"
@@ -15,19 +16,21 @@ import (
 
 func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
 
-	// Initialize database
-	dbPool, err := database.New(ctx, database.Config{
-		Host:            cfg.Database.Host,
-		Port:            cfg.Database.Port,
-		Database:        cfg.Database.Name,
-		User:            cfg.Database.User,
-		Password:        cfg.Database.Password,
-		MaxConns:        cfg.Database.MaxOpenConns,
-		MinConns:        5,
-		MaxConnLifetime: time.Duration(cfg.Database.ConnMaxLifetime) * time.Second,
-		MaxConnIdleTime: 30 * time.Minute,
-		DisableTLS:      cfg.Database.DisableTLS,
-		LogLevel:        cfg.App.LogLevel,
+	// Initialize database with retry logic
+	dbPool, err := retry.ConnectWithRetry(ctx, retry.DefaultRetryConfig(), func(ctx context.Context) (*database.Pool, error) {
+		return database.New(ctx, database.Config{
+			Host:            cfg.Database.Host,
+			Port:            cfg.Database.Port,
+			Database:        cfg.Database.Name,
+			User:            cfg.Database.User,
+			Password:        cfg.Database.Password,
+			MaxConns:        cfg.Database.MaxOpenConns,
+			MinConns:        5,
+			MaxConnLifetime: time.Duration(cfg.Database.ConnMaxLifetime) * time.Second,
+			MaxConnIdleTime: 30 * time.Minute,
+			DisableTLS:      cfg.Database.DisableTLS,
+			LogLevel:        cfg.App.LogLevel,
+		})
 	})
 	if err != nil {
 		logger.Error(ctx, "Failed to connect to database", "error", err)
