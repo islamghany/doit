@@ -69,6 +69,14 @@ install-sqlc:
 install-migrate:
 	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
+# Install mockgen (if not installed)
+install-mockgen:
+	go install go.uber.org/mock/mockgen@latest
+
+# Generate mocks for testing
+generate-mocks:
+	@./scripts/generate-mocks.sh
+
 # Database migrations
 migrate-up:
 	migrate -path internal/data/migrations -database "$(DB_URL)" up

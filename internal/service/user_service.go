@@ -17,13 +17,19 @@ import (
 // This is a FAT SERVICE - all business logic lives here
 type UserService struct {
 	pool    *database.Pool
-	queries *db.Queries
+	querier db.Querier
 }
 
 func NewUserService(pool *database.Pool) *UserService {
 	return &UserService{
 		pool:    pool,
-		queries: db.New(pool),
+		querier: db.New(pool),
+	}
+}
+
+func NewUserServiceWithQuerier(querier db.Querier) *UserService {
+	return &UserService{
+		querier: querier,
 	}
 }
 
@@ -51,7 +57,7 @@ func (s *UserService) CreateUser(ctx context.Context, input model.CreateUserInpu
 	}
 
 	// Create user
-	user, err := s.queries.CreateUser(ctx, db.CreateUserParams{
+	user, err := s.querier.CreateUser(ctx, db.CreateUserParams{
 		ID:           uuid.New(),
 		Email:        input.Email,
 		Username:     input.Username,
@@ -67,7 +73,7 @@ func (s *UserService) CreateUser(ctx context.Context, input model.CreateUserInpu
 
 // GetUserByID retrieves a user by ID
 func (s *UserService) GetUserByID(ctx context.Context, userID uuid.UUID) (*model.User, error) {
-	user, err := s.queries.GetUserByID(ctx, userID)
+	user, err := s.querier.GetUserByID(ctx, userID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
@@ -80,7 +86,7 @@ func (s *UserService) GetUserByID(ctx context.Context, userID uuid.UUID) (*model
 
 // GetUserByEmail retrieves a user by email
 func (s *UserService) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
-	user, err := s.queries.GetUserByEmail(ctx, email)
+	user, err := s.querier.GetUserByEmail(ctx, email)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
@@ -93,7 +99,7 @@ func (s *UserService) GetUserByEmail(ctx context.Context, email string) (*model.
 
 // GetUserByUsername retrieves a user by username
 func (s *UserService) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
-	user, err := s.queries.GetUserByUsername(ctx, username)
+	user, err := s.querier.GetUserByUsername(ctx, username)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
@@ -107,7 +113,7 @@ func (s *UserService) GetUserByUsername(ctx context.Context, username string) (*
 // AuthenticateUser validates credentials and updates last login
 func (s *UserService) AuthenticateUser(ctx context.Context, input model.LoginInput) (*model.User, error) {
 	// Get user by email
-	user, err := s.queries.GetUserByEmail(ctx, input.Email)
+	user, err := s.querier.GetUserByEmail(ctx, input.Email)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("invalid credentials")
@@ -126,7 +132,7 @@ func (s *UserService) AuthenticateUser(ctx context.Context, input model.LoginInp
 	}
 
 	// Update last login time (non-critical, don't fail auth if this fails)
-	if err := s.queries.UpdateUserLastLogin(ctx, user.ID); err != nil {
+	if err := s.querier.UpdateUserLastLogin(ctx, user.ID); err != nil {
 		// Log error but don't fail authentication
 		fmt.Printf("failed to update last login: %v\n", err)
 	}
@@ -146,7 +152,7 @@ func (s *UserService) UpdateUser(ctx context.Context, userID uuid.UUID, input mo
 		}
 	}
 
-	user, err := s.queries.UpdateUser(ctx, db.UpdateUserParams{
+	user, err := s.querier.UpdateUser(ctx, db.UpdateUserParams{
 		ID:       userID,
 		Email:    input.Email,
 		Username: input.Username,
@@ -171,7 +177,7 @@ func (s *UserService) UpdateUserPassword(ctx context.Context, userID uuid.UUID, 
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	err = s.queries.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{
+	err = s.querier.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{
 		ID:           userID,
 		PasswordHash: string(hashedPassword),
 	})
@@ -184,7 +190,7 @@ func (s *UserService) UpdateUserPassword(ctx context.Context, userID uuid.UUID, 
 
 // VerifyUserEmail marks a user's email as verified
 func (s *UserService) VerifyUserEmail(ctx context.Context, userID uuid.UUID) error {
-	err := s.queries.VerifyUserEmail(ctx, userID)
+	err := s.querier.VerifyUserEmail(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("failed to verify email: %w", err)
 	}
@@ -195,7 +201,7 @@ func (s *UserService) VerifyUserEmail(ctx context.Context, userID uuid.UUID) err
 func (s *UserService) ListUsers(ctx context.Context, filter model.UserFilter) ([]*model.User, error) {
 	// If email filter is provided, use search
 	if filter.Email != nil && *filter.Email != "" {
-		users, err := s.queries.SearchUsersByEmail(ctx, db.SearchUsersByEmailParams{
+		users, err := s.querier.SearchUsersByEmail(ctx, db.SearchUsersByEmailParams{
 			Column1: filter.Email,
 			Limit:   filter.Limit,
 		})
@@ -206,7 +212,7 @@ func (s *UserService) ListUsers(ctx context.Context, filter model.UserFilter) ([
 	}
 
 	// Otherwise use regular list
-	users, err := s.queries.ListUsers(ctx, db.ListUsersParams{
+	users, err := s.querier.ListUsers(ctx, db.ListUsersParams{
 		Limit:  filter.Limit,
 		Offset: filter.Offset,
 	})
@@ -219,7 +225,7 @@ func (s *UserService) ListUsers(ctx context.Context, filter model.UserFilter) ([
 
 // CountUsers returns the total count of users
 func (s *UserService) CountUsers(ctx context.Context) (int64, error) {
-	count, err := s.queries.CountUsers(ctx)
+	count, err := s.querier.CountUsers(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count users: %w", err)
 	}
@@ -233,7 +239,7 @@ func (s *UserService) BatchUpdateUsersMetadata(ctx context.Context, userIDs []uu
 		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
-	err = s.queries.BulkUpdateUsersMetadata(ctx, db.BulkUpdateUsersMetadataParams{
+	err = s.querier.BulkUpdateUsersMetadata(ctx, db.BulkUpdateUsersMetadataParams{
 		Column1: userIDs,
 		Column2: metadataJSON,
 	})
