@@ -30,6 +30,11 @@ type Pool struct {
 	*pgxpool.Pool
 }
 
+// PoolConn wraps a connection from the pool
+type PoolConn struct {
+	Conn *pgxpool.Conn
+}
+
 // New creates a new database connection pool with optimized settings
 func New(ctx context.Context, cfg Config) (*Pool, error) {
 	poolConfig, err := buildPoolConfig(cfg)
@@ -81,8 +86,9 @@ func buildPoolConfig(cfg Config) (*pgxpool.Config, error) {
 	return poolConfig, nil
 }
 
-// buildDSN constructs the PostgreSQL connection string
-func buildDSN(cfg Config) string {
+// BuildDSN constructs the PostgreSQL connection string
+// Exported for testing purposes
+func BuildDSN(cfg Config) string {
 	sslMode := "require"
 	if cfg.DisableTLS {
 		sslMode = "disable"
@@ -98,6 +104,11 @@ func buildDSN(cfg Config) string {
 		sslMode,
 		cfg.MaxConns,
 	)
+}
+
+// buildDSN is kept for backward compatibility (private wrapper)
+func buildDSN(cfg Config) string {
+	return BuildDSN(cfg)
 }
 
 // StatusCheck returns pool statistics for health checks
