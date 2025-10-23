@@ -1,5 +1,5 @@
 # golangci-lint configuration for Go 1.24
-# golangci-lint v2.5.0+
+# Compatible with golangci-lint v2.5+
 
 version: 2
 
@@ -7,44 +7,30 @@ run:
   timeout: 5m
   tests: true
   modules-download-mode: readonly
-
-  # Exclude directories
   skip-dirs:
     - bin
     - vendor
     - infra
-
-  # Exclude files
   skip-files:
     - ".*\\.generated\\.go$"
     - ".*mock.*\\.go$"
-    - internal/data/db/.*\\.go$ # Exclude sqlc generated code
+    - internal/data/db/.*\\.go$
 
 linters:
   enable:
-    # Default linters (always enabled)
-    - errcheck # Check for unchecked errors
-    - govet # Reports suspicious constructs
-    - ineffassign # Detect ineffectual assignments
-    - staticcheck # Advanced Go linting (includes gosimple, stylecheck, etc.)
-    - unused # Find unused code
-
-    # Additional linters
-    - gocyclo # Cyclomatic complexity
-    - misspell # Spelling mistakes
-    - revive # Fast, configurable linter
-    - prealloc # Find slice declarations that could be preallocated
-    - unconvert # Remove unnecessary type conversions
-    - goconst # Find repeated strings
-    - errname # Check error names
-    - errorlint # Error wrapping issues
-
-  disable:
-    - exhaustive
-    - exhaustruct
-    - varnamelen
-    - nlreturn
-    - wsl
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gocyclo
+    - misspell
+    - revive
+    - prealloc
+    - unconvert
+    - goconst
+    - errname
+    - errorlint
 
 linters-settings:
   errcheck:
@@ -53,8 +39,9 @@ linters-settings:
 
   govet:
     enable-all: true
-    disable:
-      - shadow
+    settings:
+      shadow:
+        strict: false
 
   gocyclo:
     min-complexity: 15
@@ -78,46 +65,30 @@ linters-settings:
         severity: warning
         disabled: false
         arguments:
-          - ["ID", "UUID", "HTTP", "JSON", "API", "URL", "DB"]
+          - - "ID"
+            - "UUID"
+            - "HTTP"
+            - "JSON"
+            - "API"
+            - "URL"
+            - "DB"
 
 issues:
   exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
-
-  # Exclude common false positives
   exclude-rules:
-    # Exclude some linters from running on tests files
     - path: _test\.go
       linters:
         - gocyclo
         - errcheck
         - goconst
-
-    # Exclude sqlc generated files
     - path: internal/data/db/
       linters:
         - all
-
-    # Exclude mock files
     - path: mocks/
       linters:
         - all
-
-    # Allow globals in main and config
-    - path: (cmd/.*main\.go|internal/config/)
-      text: "G101|G104"
-
-    # Exclude known issues in migration files
     - path: migrations/
       linters:
         - all
-
-output:
-  formats:
-    colored-line-number:
-      path: stdout
-  print-issued-lines: true
-  print-linter-name: true
-  uniq-by-line: true
-  sort-results: true

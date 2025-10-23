@@ -66,7 +66,7 @@ clean:
 
 # Generate sqlc code
 sqlc:
-	sqlc generate
+	$(shell go env GOPATH)/bin/sqlc generate
 
 # Install sqlc (if not installed)
 install-sqlc:
