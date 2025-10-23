@@ -33,6 +33,13 @@ help:
 	@echo ""
 	@echo "📦 Code Generation:"
 	@echo "  sqlc           - Generate sqlc code"
+	@echo "  generate-mocks - Generate mock files for testing"
+	@echo ""
+	@echo "🔍 Code Quality:"
+	@echo "  lint           - Run golangci-lint"
+	@echo "  lint-fix       - Run golangci-lint with auto-fix"
+	@echo "  security       - Run security checks (gosec)"
+	@echo "  vuln-check     - Check for vulnerabilities (govulncheck)"
 	@echo ""
 	@echo "🐳 Docker:"
 	@echo "  docker-up      - Start Docker containers"
@@ -181,3 +188,33 @@ setup: dev-db migrate-up seed-dev
 
 # Development workflow
 dev: setup run
+
+# Linting and code quality
+lint:
+	@command -v golangci-lint >/dev/null 2>&1 || (echo "❌ golangci-lint not found. Run 'make install-lint' first." && exit 1)
+	$(shell go env GOPATH)/bin/golangci-lint run ./...
+
+lint-fix:
+	@command -v golangci-lint >/dev/null 2>&1 || (echo "❌ golangci-lint not found. Run 'make install-lint' first." && exit 1)
+	$(shell go env GOPATH)/bin/golangci-lint run --fix ./...
+
+# Install golangci-lint
+install-lint:
+	@command -v golangci-lint >/dev/null 2>&1 || \
+	(echo "Installing golangci-lint..." && \
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin)
+
+# Security checks
+security:
+	@command -v gosec >/dev/null 2>&1 || (echo "Installing gosec..." && go install github.com/securego/gosec/v2/cmd/gosec@latest)
+	$(shell go env GOPATH)/bin/gosec -fmt=json -out=gosec-report.json -no-fail ./...
+	@echo "✅ Security scan complete. Report saved to gosec-report.json"
+
+# Vulnerability check
+vuln-check:
+	@command -v govulncheck >/dev/null 2>&1 || (echo "Installing govulncheck..." && go install golang.org/x/vuln/cmd/govulncheck@latest)
+	$(shell go env GOPATH)/bin/govulncheck ./...
+
+# Run all checks (CI simulation)
+ci: lint test security vuln-check
+	@echo "✅ All CI checks passed!"
