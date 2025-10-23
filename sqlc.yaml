@@ -22,7 +22,7 @@ sql:
           - db_type: "timestamptz"
             go_type: "time.Time"
           - db_type: "jsonb"
-            go_type: "json.RawMessage"
+            go_type: "encoding/json.RawMessage"
             go_struct_tag: 'json:"{{.Name}}"'
         rename:
           id: "ID"
@@ -30,4 +30,3 @@ sql:
           created_at: "CreatedAt"
           updated_at: "UpdatedAt"
           deleted_at: "DeletedAt"
-
