@@ -1,0 +1,24 @@
+{
+  "editor.tabSize": 2, // tab size
+
+  "workbench.colorCustomizations": {
+    "statusBar.background": "#1A2A4F",
+    "statusBar.foreground": "#ffffff",
+    "statusBar.debuggingForeground": "#ffffff",
+    "statusBar.noFolderForeground": "#ffffff"
+  },
+
+  "editor.inlineSuggest.enabled": true,
+
+  "workbench.editor.pinnedTabSizing": "shrink",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "prettier.embeddedLanguageFormatting": "off",
+
+  "workbench.editor.enablePreview": false,
+  "editor.guides.indentation": false,
+  "workbench.startupEditor": "none",
+  "redhat.telemetry.enabled": true,
+  "editor.formatOnSave": true,
+  "eslint.alwaysShowStatus": true,
+  "editor.fontSize": 14.5
+}

@@ -16,16 +16,21 @@ import (
 // TodoService handles all todo-related business logic
 type TodoService struct {
 	pool    *database.Pool
-	queries *db.Queries
+	querier db.Querier
 }
 
 func NewTodoService(pool *database.Pool) *TodoService {
 	return &TodoService{
 		pool:    pool,
-		queries: db.New(pool),
+		querier: db.New(pool),
 	}
 }
 
+func NewTodoServiceWithQuerier(querier db.Querier) *TodoService {
+	return &TodoService{
+		querier: querier,
+	}
+}
 // CreateTodo creates a new todo
 func (s *TodoService) CreateTodo(ctx context.Context, input model.CreateTodoInput) (*model.Todo, error) {
 	if err := s.validateCreateTodoInput(input); err != nil {
@@ -68,7 +73,7 @@ func (s *TodoService) CreateTodo(ctx context.Context, input model.CreateTodoInpu
 		tags = []string{}
 	}
 
-	todo, err := s.queries.CreateTodo(ctx, db.CreateTodoParams{
+	todo, err := s.querier.CreateTodo(ctx, db.CreateTodoParams{
 		ID:          uuid.New(),
 		UserID:      input.UserID,
 		Title:       input.Title,
@@ -88,7 +93,7 @@ func (s *TodoService) CreateTodo(ctx context.Context, input model.CreateTodoInpu
 
 // GetTodoByID retrieves a todo by ID
 func (s *TodoService) GetTodoByID(ctx context.Context, todoID uuid.UUID) (*model.Todo, error) {
-	todo, err := s.queries.GetTodoByID(ctx, todoID)
+	todo, err := s.querier.GetTodoByID(ctx, todoID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("todo not found")
@@ -101,7 +106,7 @@ func (s *TodoService) GetTodoByID(ctx context.Context, todoID uuid.UUID) (*model
 
 // ListUserTodos retrieves paginated todos for a user
 func (s *TodoService) ListUserTodos(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]*model.Todo, error) {
-	todos, err := s.queries.ListTodosByUser(ctx, db.ListTodosByUserParams{
+	todos, err := s.querier.ListTodosByUser(ctx, db.ListTodosByUserParams{
 		UserID: userID,
 		Limit:  limit,
 		Offset: offset,
@@ -115,7 +120,7 @@ func (s *TodoService) ListUserTodos(ctx context.Context, userID uuid.UUID, limit
 
 // ListTodosByStatus retrieves todos filtered by status
 func (s *TodoService) ListTodosByStatus(ctx context.Context, userID uuid.UUID, status model.TodoStatus, limit, offset int32) ([]*model.Todo, error) {
-	todos, err := s.queries.ListTodosByUserAndStatus(ctx, db.ListTodosByUserAndStatusParams{
+	todos, err := s.querier.ListTodosByUserAndStatus(ctx, db.ListTodosByUserAndStatusParams{
 		UserID: userID,
 		Status: db.TodoStatus(status),
 		Limit:  limit,
@@ -178,7 +183,7 @@ func (s *TodoService) UpdateTodo(ctx context.Context, todoID uuid.UUID, input mo
 		}
 	}
 
-	todo, err := s.queries.UpdateTodo(ctx, params)
+	todo, err := s.querier.UpdateTodo(ctx, params)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("todo not found")
@@ -197,10 +202,10 @@ func (s *TodoService) CompleteTodo(ctx context.Context, todoID uuid.UUID, userID
 
 	// Use transaction with row locking
 	txErr := database.WithTransaction(ctx, s.pool.Pool, database.DefaultTxOptions(), func(tx pgx.Tx) error {
-		txQueries := s.queries.WithTx(tx)
+		txQuerier := db.New(tx)
 
 		// Lock the row for update
-		todo, err = txQueries.GetTodoByIDForUpdate(ctx, todoID)
+		todo, err = txQuerier.GetTodoByIDForUpdate(ctx, todoID)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				return fmt.Errorf("todo not found")
@@ -219,7 +224,7 @@ func (s *TodoService) CompleteTodo(ctx context.Context, todoID uuid.UUID, userID
 		}
 
 		// Complete the todo
-		todo, err = txQueries.CompleteTodo(ctx, todoID)
+		todo, err = txQuerier.CompleteTodo(ctx, todoID)
 		if err != nil {
 			return fmt.Errorf("failed to complete todo: %w", err)
 		}
@@ -237,9 +242,9 @@ func (s *TodoService) CompleteTodo(ctx context.Context, todoID uuid.UUID, userID
 // BulkCompleteTodos completes multiple todos
 func (s *TodoService) BulkCompleteTodos(ctx context.Context, todoIDs []uuid.UUID) error {
 	return database.WithTransaction(ctx, s.pool.Pool, database.DefaultTxOptions(), func(tx pgx.Tx) error {
-		txQueries := s.queries.WithTx(tx)
+		txQuerier := db.New(tx)
 
-		err := txQueries.BulkUpdateTodoStatus(ctx, db.BulkUpdateTodoStatusParams{
+		err := txQuerier.BulkUpdateTodoStatus(ctx, db.BulkUpdateTodoStatusParams{
 			Column1: todoIDs,
 			Status:  db.TodoStatusCompleted,
 		})
@@ -253,7 +258,7 @@ func (s *TodoService) BulkCompleteTodos(ctx context.Context, todoIDs []uuid.UUID
 
 // BulkDeleteTodos deletes multiple todos
 func (s *TodoService) BulkDeleteTodos(ctx context.Context, todoIDs []uuid.UUID, userID uuid.UUID) error {
-	err := s.queries.HardDeleteTodos(ctx, db.HardDeleteTodosParams{
+	err := s.querier.HardDeleteTodos(ctx, db.HardDeleteTodosParams{
 		Column1: todoIDs,
 		UserID:  userID,
 	})
@@ -264,7 +269,7 @@ func (s *TodoService) BulkDeleteTodos(ctx context.Context, todoIDs []uuid.UUID, 
 }
 
 func (s *TodoService) DeleteTodo(ctx context.Context, todoID uuid.UUID, userID uuid.UUID) error {
-	err := s.queries.HardDeleteTodo(ctx, db.HardDeleteTodoParams{
+	err := s.querier.HardDeleteTodo(ctx, db.HardDeleteTodoParams{
 		ID:     todoID,
 		UserID: userID,
 	})
@@ -276,7 +281,7 @@ func (s *TodoService) DeleteTodo(ctx context.Context, todoID uuid.UUID, userID u
 
 // GetTodoStats retrieves aggregated statistics
 func (s *TodoService) GetTodoStats(ctx context.Context, userID uuid.UUID) (*model.TodoStats, error) {
-	stats, err := s.queries.GetTodoStats(ctx, userID)
+	stats, err := s.querier.GetTodoStats(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get todo stats: %w", err)
 	}
@@ -292,7 +297,7 @@ func (s *TodoService) GetTodoStats(ctx context.Context, userID uuid.UUID) (*mode
 
 // CountUserTodos counts total todos for a user
 func (s *TodoService) CountUserTodos(ctx context.Context, userID uuid.UUID) (int64, error) {
-	count, err := s.queries.CountUserTodos(ctx, userID)
+	count, err := s.querier.CountUserTodos(ctx, userID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count todos: %w", err)
 	}
@@ -301,7 +306,7 @@ func (s *TodoService) CountUserTodos(ctx context.Context, userID uuid.UUID) (int
 
 // SearchTodosByTitle searches todos by title
 func (s *TodoService) SearchTodosByTitle(ctx context.Context, userID uuid.UUID, query string, limit int32) ([]*model.Todo, error) {
-	todos, err := s.queries.SearchTodosByTitle(ctx, db.SearchTodosByTitleParams{
+	todos, err := s.querier.SearchTodosByTitle(ctx, db.SearchTodosByTitleParams{
 		UserID:  userID,
 		Column2: &query,
 		Limit:   limit,
@@ -315,7 +320,7 @@ func (s *TodoService) SearchTodosByTitle(ctx context.Context, userID uuid.UUID, 
 
 // GetTodosByTags retrieves todos with specific tags
 func (s *TodoService) GetTodosByTags(ctx context.Context, userID uuid.UUID, tags []string) ([]*model.Todo, error) {
-	todos, err := s.queries.GetTodosByTags(ctx, db.GetTodosByTagsParams{
+	todos, err := s.querier.GetTodosByTags(ctx, db.GetTodosByTagsParams{
 		UserID:  userID,
 		Column2: tags,
 	})
@@ -328,7 +333,7 @@ func (s *TodoService) GetTodosByTags(ctx context.Context, userID uuid.UUID, tags
 
 // GetOverdueTodos retrieves overdue todos across all users (admin function)
 func (s *TodoService) GetOverdueTodos(ctx context.Context, limit int32) ([]*model.Todo, error) {
-	results, err := s.queries.GetOverdueTodos(ctx, limit)
+	results, err := s.querier.GetOverdueTodos(ctx, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get overdue todos: %w", err)
 	}
