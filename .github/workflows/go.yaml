@@ -6,6 +6,11 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read # Explicit read access to repository code
+  security-events: write
+  actions: read
+
 jobs:
   # Build verification
   build:
