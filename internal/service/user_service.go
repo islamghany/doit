@@ -6,11 +6,18 @@ import (
 	"doit/internal/model"
 	"doit/pkg/database"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
+)
+
+// Sentinel errors for user service
+var (
+	ErrDuplicateEmail = errors.New("email already exists")
+	ErrInvalidInput   = errors.New("invalid input")
 )
 
 // UserService handles all user-related business logic
@@ -68,7 +75,7 @@ func (s *UserService) CreateUser(ctx context.Context, input model.CreateUserInpu
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	return s.toUserModel(user), nil
+	return toUserModel(user), nil
 }
 
 // GetUserByID retrieves a user by ID
@@ -81,7 +88,7 @@ func (s *UserService) GetUserByID(ctx context.Context, userID uuid.UUID) (*model
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	return s.toUserModel(user), nil
+	return toUserModel(user), nil
 }
 
 // GetUserByEmail retrieves a user by email
@@ -94,7 +101,7 @@ func (s *UserService) GetUserByEmail(ctx context.Context, email string) (*model.
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	return s.toUserModel(user), nil
+	return toUserModel(user), nil
 }
 
 // GetUserByUsername retrieves a user by username
@@ -107,7 +114,7 @@ func (s *UserService) GetUserByUsername(ctx context.Context, username string) (*
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	return s.toUserModel(user), nil
+	return toUserModel(user), nil
 }
 
 // AuthenticateUser validates credentials and updates last login
@@ -137,7 +144,7 @@ func (s *UserService) AuthenticateUser(ctx context.Context, input model.LoginInp
 		fmt.Printf("failed to update last login: %v\n", err)
 	}
 
-	return s.toUserModel(user), nil
+	return toUserModel(user), nil
 }
 
 // UpdateUser updates user information
@@ -166,7 +173,7 @@ func (s *UserService) UpdateUser(ctx context.Context, userID uuid.UUID, input mo
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
 
-	return s.toUserModel(user), nil
+	return toUserModel(user), nil
 }
 
 // UpdateUserPassword updates a user's password
@@ -254,18 +261,18 @@ func (s *UserService) BatchUpdateUsersMetadata(ctx context.Context, userIDs []uu
 
 func (s *UserService) validateCreateUserInput(input model.CreateUserInput) error {
 	if input.Email == "" {
-		return fmt.Errorf("email is required")
+		return fmt.Errorf("%w: email is required", ErrInvalidInput)
 	}
 	if input.Username == "" {
-		return fmt.Errorf("username is required")
+		return fmt.Errorf("%w: username is required", ErrInvalidInput)
 	}
 	if len(input.Password) < 8 {
-		return fmt.Errorf("password must be at least 8 characters")
+		return fmt.Errorf("%w: password must be at least 8 characters", ErrInvalidInput)
 	}
 	return nil
 }
 
-func (s *UserService) toUserModel(user db.User) *model.User {
+func toUserModel(user db.User) *model.User {
 	userModel := &model.User{
 		ID:            user.ID,
 		Email:         user.Email,
@@ -295,7 +302,7 @@ func (s *UserService) toUserModel(user db.User) *model.User {
 func (s *UserService) toUserModels(users []db.User) []*model.User {
 	models := make([]*model.User, len(users))
 	for i, user := range users {
-		models[i] = s.toUserModel(user)
+		models[i] = toUserModel(user)
 	}
 	return models
 }

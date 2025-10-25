@@ -19,6 +19,14 @@ type User struct {
 	UpdatedAt     time.Time              `json:"updated_at"`
 }
 
+func (u *User) IsUserActive() bool {
+	return u.IsActive
+}
+
+func (u *User) IsUserEmailVerified() bool {
+	return u.EmailVerified
+}
+
 // CreateUserInput represents input for creating a user
 type CreateUserInput struct {
 	Email    string                 `json:"email" validate:"required,email"`
