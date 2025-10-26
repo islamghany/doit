@@ -65,7 +65,7 @@ type Config struct {
 	Server   ServerConfig   `prefix:"SERVER_"`
 	App      AppConfig      `prefix:"APP_"`
 	Database DatabaseConfig `prefix:"DB_"`
-	// JWT      JWTConfig      `prefix:"JWT_"`
+	JWT      JWTConfig      `prefix:"JWT_"`
 	// Redis    RedisConfig    `prefix:"REDIS_"`
 }
 

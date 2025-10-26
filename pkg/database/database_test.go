@@ -224,3 +224,6 @@ func BenchmarkBuildDSN(b *testing.B) {
 		_ = BuildDSN(config)
 	}
 }
+
+
+
