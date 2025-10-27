@@ -44,6 +44,7 @@ type RedisConfig struct {
 
 type JWTConfig struct {
 	Secret          string `env:"SECRET" flag:"jwt_secret" required:"true"`
+	RefreshSecret   string `env:"REFRESH_SECRET" flag:"refresh_secret" required:"true"`
 	AccessTokenExp  int    `env:"ACCESS_TOKEN_EXP" flag:"access_token_exp" required:"true"`
 	RefreshTokenExp int    `env:"REFRESH_TOKEN_EXP" flag:"refresh_token_exp" required:"true"`
 }
