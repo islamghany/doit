@@ -6,6 +6,7 @@ package db
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -101,6 +102,17 @@ func (ns NullTodoStatus) Value() (driver.Value, error) {
 	return string(ns.TodoStatus), nil
 }
 
+type RefreshToken struct {
+	ID         uuid.UUID        `db:"id" json:"id"`
+	UserID     uuid.UUID        `db:"user_id" json:"user_id"`
+	TokenHash  string           `db:"token_hash" json:"token_hash"`
+	ExpiresAt  pgtype.Timestamp `db:"expires_at" json:"expires_at"`
+	IsRevoked  bool             `db:"is_revoked" json:"is_revoked"`
+	CreatedAt  pgtype.Timestamp `db:"created_at" json:"created_at"`
+	LastUsedAt pgtype.Timestamp `db:"last_used_at" json:"last_used_at"`
+	DeviceInfo json.RawMessage  `db:"device_info" json:"{{.Name}}"`
+}
+
 type Todo struct {
 	ID          uuid.UUID          `db:"id" json:"id"`
 	UserID      uuid.UUID          `db:"user_id" json:"user_id"`
@@ -127,4 +139,5 @@ type User struct {
 	LastLoginAt   pgtype.Timestamptz `db:"last_login_at" json:"last_login_at"`
 	CreatedAt     time.Time          `db:"created_at" json:"created_at"`
 	UpdatedAt     time.Time          `db:"updated_at" json:"updated_at"`
+	TokenVersion  *int32             `db:"token_version" json:"token_version"`
 }

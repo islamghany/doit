@@ -18,6 +18,7 @@ import (
 var (
 	ErrDuplicateEmail = errors.New("email already exists")
 	ErrInvalidInput   = errors.New("invalid input")
+	ErrInvalidCredentials = errors.New("invalid credentials")
 )
 
 // UserService handles all user-related business logic
@@ -128,14 +129,14 @@ func (s *UserService) AuthenticateUser(ctx context.Context, input model.LoginInp
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	// Check if user is active
-	if !user.IsActive {
-		return nil, fmt.Errorf("user account is inactive")
-	}
+	// // Check if user is active
+	// if !user.IsActive {
+	// 	return nil, fmt.Errorf("user account is inactive")
+	// }
 
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
-		return nil, fmt.Errorf("invalid credentials")
+		return nil, ErrInvalidCredentials
 	}
 
 	// Update last login time (non-critical, don't fail auth if this fails)
@@ -281,6 +282,7 @@ func toUserModel(user db.User) *model.User {
 		IsActive:      user.IsActive,
 		CreatedAt:     user.CreatedAt,
 		UpdatedAt:     user.UpdatedAt,
+		TokenVersion:  *user.TokenVersion,
 	}
 
 	// Handle nullable last login

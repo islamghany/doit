@@ -13,28 +13,39 @@ import (
 type Querier interface {
 	BulkUpdateTodoStatus(ctx context.Context, arg BulkUpdateTodoStatusParams) error
 	BulkUpdateUsersMetadata(ctx context.Context, arg BulkUpdateUsersMetadataParams) error
+	CleanupExpiredTokens(ctx context.Context) error
 	CompleteTodo(ctx context.Context, id uuid.UUID) (Todo, error)
 	CountUserTodos(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUserTodosByStatus(ctx context.Context, arg CountUserTodosByStatusParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
+	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateTodo(ctx context.Context, arg CreateTodoParams) (Todo, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	GetOverdueTodos(ctx context.Context, limit int32) ([]GetOverdueTodosRow, error)
+	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
+	// For security checks (detect reuse)
+	GetRefreshTokenIncludingRevoked(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetTodoByID(ctx context.Context, id uuid.UUID) (Todo, error)
 	// Use FOR UPDATE to lock the row for updates (prevents race conditions)
 	GetTodoByIDForUpdate(ctx context.Context, id uuid.UUID) (Todo, error)
 	GetTodoStats(ctx context.Context, userID uuid.UUID) (GetTodoStatsRow, error)
 	GetTodosByTags(ctx context.Context, arg GetTodosByTagsParams) ([]Todo, error)
+	GetUserActiveRefreshTokens(ctx context.Context, userID uuid.UUID) ([]GetUserActiveRefreshTokensRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetUserTokenVersion(ctx context.Context, id uuid.UUID) (*int32, error)
 	HardDeleteTodo(ctx context.Context, arg HardDeleteTodoParams) error
 	HardDeleteTodos(ctx context.Context, arg HardDeleteTodosParams) error
+	IncrementUserTokenVersion(ctx context.Context, id uuid.UUID) (*int32, error)
 	ListTodosByUser(ctx context.Context, arg ListTodosByUserParams) ([]Todo, error)
 	ListTodosByUserAndStatus(ctx context.Context, arg ListTodosByUserAndStatusParams) ([]Todo, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	RevokeAllUserRefreshTokens(ctx context.Context, userID uuid.UUID) error
+	RevokeRefreshToken(ctx context.Context, tokenHash string) error
 	SearchTodosByTitle(ctx context.Context, arg SearchTodosByTitleParams) ([]Todo, error)
 	SearchUsersByEmail(ctx context.Context, arg SearchUsersByEmailParams) ([]User, error)
+	UpdateRefreshTokenUsage(ctx context.Context, id uuid.UUID) error
 	UpdateTodo(ctx context.Context, arg UpdateTodoParams) (Todo, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserLastLogin(ctx context.Context, id uuid.UUID) error

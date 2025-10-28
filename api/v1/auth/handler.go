@@ -13,12 +13,13 @@ import (
 
 type Handler struct {
 	log     *logger.Logger
-	authService *service.AuthService
+	userService *service.UserService
+	tokenService *service.TokenService
 	config *config.Config
 }
 
-func NewHandler(log *logger.Logger, authService *service.AuthService, config *config.Config) *Handler {
-	return &Handler{log: log, authService: authService, config: config}
+func NewHandler(log *logger.Logger, userService *service.UserService, tokenService *service.TokenService, config *config.Config) *Handler {
+	return &Handler{log: log, userService: userService, tokenService: tokenService, config: config}
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) error {
@@ -30,7 +31,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) error {
 		return web.NewError(err, http.StatusBadRequest)
 	}
 
-	user, err := h.authService.AuthenticateUser(ctx, model.LoginInput{
+	user, err := h.userService.AuthenticateUser(ctx, model.LoginInput{
 		Email:    input.Email,
 		Password: input.Password,
 	})
@@ -39,7 +40,21 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) error {
 		return h.handleAuthError(err)
 	}
 
-	return web.RespondOK(w, r, user)
+	deviceInfo := model.DeviceInfo{
+		IPAddress: web.GetClientIP(r),
+		UserAgent: web.GetUserAgent(r),
+		DeviceName: web.GetDeviceName(r),
+	}
+
+	tokens, err := h.tokenService.CreateTokenPair(ctx, *user, deviceInfo)
+	if err != nil {
+		return web.NewError(err, http.StatusInternalServerError)
+	}
+	response := map[string]interface{}{
+		"user": user,
+		"tokens": tokens,
+	}
+	return web.RespondOK(w, r, response)
 }
 
 // handleAuthError maps service errors to appropriate HTTP responses
@@ -48,8 +63,8 @@ func (h *Handler) handleAuthError( err error) error {
 	switch {
 	case errors.Is(err, service.ErrInvalidCredentials):
 		return web.NewError(errors.New("invalid credentials"), http.StatusUnauthorized)
-	case errors.Is(err, service.ErrUserInactive):
-		return web.NewError(errors.New("user account is inactive"), http.StatusForbidden)
+	// case errors.Is(err, service.ErrUserInactive):
+	// 	return web.NewError(errors.New("user account is inactive"), http.StatusForbidden)
 	default:
 		return web.NewError(errors.New("internal server error"), http.StatusInternalServerError)
 	}
