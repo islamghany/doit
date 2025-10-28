@@ -5,13 +5,20 @@ import (
 	"doit/internal/config"
 	"doit/internal/middlewares"
 	"doit/internal/service"
+	"doit/internal/token"
 	"doit/internal/web"
 	"doit/pkg/database"
 	"doit/pkg/logger"
 	"net/http"
 )
 
-func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool) http.Handler {
+func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool) (http.Handler, error) {
+
+  // Helpers
+	tokenMaker, err := token.NewJWTToken(cfg.JWT.Secret)
+	if err != nil {
+		return nil, err
+	}
 
 	// Middlewares
 	errorMiddleware := middlewares.ErrorMiddleware(logger)
@@ -20,10 +27,13 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool)
 	app := web.NewApp(errorMiddleware)
 
 	// Services
-	authService := service.NewAuthService(dbPool, logger)
+	userService := service.NewUserService(dbPool)
+	tokenService := service.NewTokenService(dbPool, tokenMaker, 
+		cfg.JWT.AccessTokenExp,
+		cfg.JWT.RefreshTokenExp)
 
 	// Handlers
-	authHandler := auth.NewHandler(logger, authService, cfg)
+	authHandler := auth.NewHandler(logger, userService, tokenService, cfg)
 
 	// Routes
 	auth.RegisterRoutes(app, authHandler)
@@ -32,5 +42,5 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool)
 		return web.RespondOK(w, r, map[string]string{"status": "ok"})
 	})
 
-	return app
+	return app, nil
 }

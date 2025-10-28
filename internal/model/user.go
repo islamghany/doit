@@ -17,6 +17,7 @@ type User struct {
 	LastLoginAt   *time.Time             `json:"last_login_at,omitempty"`
 	CreatedAt     time.Time              `json:"created_at"`
 	UpdatedAt     time.Time              `json:"updated_at"`
+	TokenVersion  int32                   `json:"token_version,omitempty"`
 }
 
 func (u *User) IsUserActive() bool {

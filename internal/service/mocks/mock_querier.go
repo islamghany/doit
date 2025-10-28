@@ -70,6 +70,20 @@ func (mr *MockQuerierMockRecorder) BulkUpdateUsersMetadata(ctx, arg any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BulkUpdateUsersMetadata", reflect.TypeOf((*MockQuerier)(nil).BulkUpdateUsersMetadata), ctx, arg)
 }
 
+// CleanupExpiredTokens mocks base method.
+func (m *MockQuerier) CleanupExpiredTokens(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CleanupExpiredTokens", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CleanupExpiredTokens indicates an expected call of CleanupExpiredTokens.
+func (mr *MockQuerierMockRecorder) CleanupExpiredTokens(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CleanupExpiredTokens", reflect.TypeOf((*MockQuerier)(nil).CleanupExpiredTokens), ctx)
+}
+
 // CompleteTodo mocks base method.
 func (m *MockQuerier) CompleteTodo(ctx context.Context, id uuid.UUID) (db.Todo, error) {
 	m.ctrl.T.Helper()
@@ -130,6 +144,21 @@ func (mr *MockQuerierMockRecorder) CountUsers(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountUsers", reflect.TypeOf((*MockQuerier)(nil).CountUsers), ctx)
 }
 
+// CreateRefreshToken mocks base method.
+func (m *MockQuerier) CreateRefreshToken(ctx context.Context, arg db.CreateRefreshTokenParams) (db.RefreshToken, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateRefreshToken", ctx, arg)
+	ret0, _ := ret[0].(db.RefreshToken)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateRefreshToken indicates an expected call of CreateRefreshToken.
+func (mr *MockQuerierMockRecorder) CreateRefreshToken(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRefreshToken", reflect.TypeOf((*MockQuerier)(nil).CreateRefreshToken), ctx, arg)
+}
+
 // CreateTodo mocks base method.
 func (m *MockQuerier) CreateTodo(ctx context.Context, arg db.CreateTodoParams) (db.Todo, error) {
 	m.ctrl.T.Helper()
@@ -173,6 +202,36 @@ func (m *MockQuerier) GetOverdueTodos(ctx context.Context, limit int32) ([]db.Ge
 func (mr *MockQuerierMockRecorder) GetOverdueTodos(ctx, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOverdueTodos", reflect.TypeOf((*MockQuerier)(nil).GetOverdueTodos), ctx, limit)
+}
+
+// GetRefreshToken mocks base method.
+func (m *MockQuerier) GetRefreshToken(ctx context.Context, tokenHash string) (db.RefreshToken, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRefreshToken", ctx, tokenHash)
+	ret0, _ := ret[0].(db.RefreshToken)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRefreshToken indicates an expected call of GetRefreshToken.
+func (mr *MockQuerierMockRecorder) GetRefreshToken(ctx, tokenHash any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRefreshToken", reflect.TypeOf((*MockQuerier)(nil).GetRefreshToken), ctx, tokenHash)
+}
+
+// GetRefreshTokenIncludingRevoked mocks base method.
+func (m *MockQuerier) GetRefreshTokenIncludingRevoked(ctx context.Context, tokenHash string) (db.RefreshToken, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRefreshTokenIncludingRevoked", ctx, tokenHash)
+	ret0, _ := ret[0].(db.RefreshToken)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRefreshTokenIncludingRevoked indicates an expected call of GetRefreshTokenIncludingRevoked.
+func (mr *MockQuerierMockRecorder) GetRefreshTokenIncludingRevoked(ctx, tokenHash any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRefreshTokenIncludingRevoked", reflect.TypeOf((*MockQuerier)(nil).GetRefreshTokenIncludingRevoked), ctx, tokenHash)
 }
 
 // GetTodoByID mocks base method.
@@ -235,6 +294,21 @@ func (mr *MockQuerierMockRecorder) GetTodosByTags(ctx, arg any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTodosByTags", reflect.TypeOf((*MockQuerier)(nil).GetTodosByTags), ctx, arg)
 }
 
+// GetUserActiveRefreshTokens mocks base method.
+func (m *MockQuerier) GetUserActiveRefreshTokens(ctx context.Context, userID uuid.UUID) ([]db.GetUserActiveRefreshTokensRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserActiveRefreshTokens", ctx, userID)
+	ret0, _ := ret[0].([]db.GetUserActiveRefreshTokensRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserActiveRefreshTokens indicates an expected call of GetUserActiveRefreshTokens.
+func (mr *MockQuerierMockRecorder) GetUserActiveRefreshTokens(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserActiveRefreshTokens", reflect.TypeOf((*MockQuerier)(nil).GetUserActiveRefreshTokens), ctx, userID)
+}
+
 // GetUserByEmail mocks base method.
 func (m *MockQuerier) GetUserByEmail(ctx context.Context, email string) (db.User, error) {
 	m.ctrl.T.Helper()
@@ -280,6 +354,21 @@ func (mr *MockQuerierMockRecorder) GetUserByUsername(ctx, username any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByUsername", reflect.TypeOf((*MockQuerier)(nil).GetUserByUsername), ctx, username)
 }
 
+// GetUserTokenVersion mocks base method.
+func (m *MockQuerier) GetUserTokenVersion(ctx context.Context, id uuid.UUID) (*int32, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserTokenVersion", ctx, id)
+	ret0, _ := ret[0].(*int32)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserTokenVersion indicates an expected call of GetUserTokenVersion.
+func (mr *MockQuerierMockRecorder) GetUserTokenVersion(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserTokenVersion", reflect.TypeOf((*MockQuerier)(nil).GetUserTokenVersion), ctx, id)
+}
+
 // HardDeleteTodo mocks base method.
 func (m *MockQuerier) HardDeleteTodo(ctx context.Context, arg db.HardDeleteTodoParams) error {
 	m.ctrl.T.Helper()
@@ -306,6 +395,21 @@ func (m *MockQuerier) HardDeleteTodos(ctx context.Context, arg db.HardDeleteTodo
 func (mr *MockQuerierMockRecorder) HardDeleteTodos(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HardDeleteTodos", reflect.TypeOf((*MockQuerier)(nil).HardDeleteTodos), ctx, arg)
+}
+
+// IncrementUserTokenVersion mocks base method.
+func (m *MockQuerier) IncrementUserTokenVersion(ctx context.Context, id uuid.UUID) (*int32, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IncrementUserTokenVersion", ctx, id)
+	ret0, _ := ret[0].(*int32)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IncrementUserTokenVersion indicates an expected call of IncrementUserTokenVersion.
+func (mr *MockQuerierMockRecorder) IncrementUserTokenVersion(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementUserTokenVersion", reflect.TypeOf((*MockQuerier)(nil).IncrementUserTokenVersion), ctx, id)
 }
 
 // ListTodosByUser mocks base method.
@@ -353,6 +457,34 @@ func (mr *MockQuerierMockRecorder) ListUsers(ctx, arg any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUsers", reflect.TypeOf((*MockQuerier)(nil).ListUsers), ctx, arg)
 }
 
+// RevokeAllUserRefreshTokens mocks base method.
+func (m *MockQuerier) RevokeAllUserRefreshTokens(ctx context.Context, userID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeAllUserRefreshTokens", ctx, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RevokeAllUserRefreshTokens indicates an expected call of RevokeAllUserRefreshTokens.
+func (mr *MockQuerierMockRecorder) RevokeAllUserRefreshTokens(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeAllUserRefreshTokens", reflect.TypeOf((*MockQuerier)(nil).RevokeAllUserRefreshTokens), ctx, userID)
+}
+
+// RevokeRefreshToken mocks base method.
+func (m *MockQuerier) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeRefreshToken", ctx, tokenHash)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RevokeRefreshToken indicates an expected call of RevokeRefreshToken.
+func (mr *MockQuerierMockRecorder) RevokeRefreshToken(ctx, tokenHash any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeRefreshToken", reflect.TypeOf((*MockQuerier)(nil).RevokeRefreshToken), ctx, tokenHash)
+}
+
 // SearchTodosByTitle mocks base method.
 func (m *MockQuerier) SearchTodosByTitle(ctx context.Context, arg db.SearchTodosByTitleParams) ([]db.Todo, error) {
 	m.ctrl.T.Helper()
@@ -381,6 +513,20 @@ func (m *MockQuerier) SearchUsersByEmail(ctx context.Context, arg db.SearchUsers
 func (mr *MockQuerierMockRecorder) SearchUsersByEmail(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchUsersByEmail", reflect.TypeOf((*MockQuerier)(nil).SearchUsersByEmail), ctx, arg)
+}
+
+// UpdateRefreshTokenUsage mocks base method.
+func (m *MockQuerier) UpdateRefreshTokenUsage(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRefreshTokenUsage", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateRefreshTokenUsage indicates an expected call of UpdateRefreshTokenUsage.
+func (mr *MockQuerierMockRecorder) UpdateRefreshTokenUsage(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRefreshTokenUsage", reflect.TypeOf((*MockQuerier)(nil).UpdateRefreshTokenUsage), ctx, id)
 }
 
 // UpdateTodo mocks base method.

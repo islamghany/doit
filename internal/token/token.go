@@ -21,8 +21,8 @@ type TokenParams struct {
 	Duration time.Duration
 }
 
-// TokenService provides methods for managing tokens.
-type TokenService interface {
+// TokenMaker provides methods for managing tokens.
+type TokenMaker interface {
 	CreateToken(params TokenParams) (string, *Payload, error)
 	VerifyToken(token string) (*Payload, error)
 }

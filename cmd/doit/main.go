@@ -17,7 +17,7 @@ var version = "v0.0.1"
 func main() {
 	// Create a context for the application.
 	ctx := context.Background()
-
+	
 	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {

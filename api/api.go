@@ -43,7 +43,10 @@ func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
 	defer dbPool.Close()
 
 	// Starting the HTTP server with graceful shutdown
-	srv := NewServer(logger, cfg, dbPool)
+	srv, err := NewServer(logger, cfg, dbPool)
+	if err != nil {
+		return fmt.Errorf("failed to create server: %w", err)
+	}
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

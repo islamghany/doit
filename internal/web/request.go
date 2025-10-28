@@ -74,3 +74,29 @@ func GetQueryInt(r *http.Request, key string, defaultValue int) int {
 	}
 	return num
 }
+
+// Helper: Extract client IP address
+func GetClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header first (proxy/load balancer)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return xff
+	}
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+	// Fallback to RemoteAddr
+	return r.RemoteAddr
+}
+
+func GetUserAgent(r *http.Request) string {
+	return r.UserAgent()
+}
+
+func GetDeviceName(r *http.Request) string {
+	return r.Header.Get("X-Device-Name")
+}
+
+func GetLocation(r *http.Request) string {
+	return r.Header.Get("X-Location")
+}
