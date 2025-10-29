@@ -82,7 +82,6 @@ func (t *JWTToken) VerifyToken(tokenString string) (*Payload, error) {
 		}
 		return []byte(t.secretKey), nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}

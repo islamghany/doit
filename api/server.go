@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/http"
+
 	"doit/api/v1/auth"
 	"doit/internal/config"
 	"doit/internal/middlewares"
@@ -9,12 +11,10 @@ import (
 	"doit/internal/web"
 	"doit/pkg/database"
 	"doit/pkg/logger"
-	"net/http"
 )
 
 func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool) (http.Handler, error) {
-
-  // Helpers
+	// Helpers
 	tokenMaker, err := token.NewJWTToken(cfg.JWT.Secret)
 	if err != nil {
 		return nil, err
@@ -28,7 +28,7 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool)
 
 	// Services
 	userService := service.NewUserService(dbPool)
-	tokenService := service.NewTokenService(dbPool, tokenMaker, 
+	tokenService := service.NewTokenService(dbPool, tokenMaker,
 		cfg.JWT.AccessTokenExp,
 		cfg.JWT.RefreshTokenExp)
 

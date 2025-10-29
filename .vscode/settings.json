@@ -1,24 +1,36 @@
 {
-  "editor.tabSize": 2, // tab size
-
-  "workbench.colorCustomizations": {
-    "statusBar.background": "#1A2A4F",
-    "statusBar.foreground": "#ffffff",
-    "statusBar.debuggingForeground": "#ffffff",
-    "statusBar.noFolderForeground": "#ffffff"
+  "go.useLanguageServer": true,
+  "go.lintOnSave": "workspace",
+  "go.lintTool": "golangci-lint",
+  "go.lintFlags": [
+    "--fast"
+  ],
+  "go.formatTool": "goimports",
+  "go.gopath": "/Users/ghany/go",
+  "go.goroot": "/opt/homebrew/Cellar/go/1.24.2/libexec",
+  "gopls": {
+    "ui.diagnostic.analyses": {
+      "unusedparams": true,
+      "shadow": true,
+      "unusedwrite": true,
+      "useany": true
+    },
+    "ui.diagnostic.staticcheck": true,
+    "ui.diagnostic.annotations": {
+      "bounds": true,
+      "escape": true,
+      "inline": true,
+      "nil": true
+    },
+    "ui.completion.usePlaceholders": true,
+    "formatting.gofumpt": true
   },
-
-  "editor.inlineSuggest.enabled": true,
-
-  "workbench.editor.pinnedTabSizing": "shrink",
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "prettier.embeddedLanguageFormatting": "off",
-
-  "workbench.editor.enablePreview": false,
-  "editor.guides.indentation": false,
-  "workbench.startupEditor": "none",
-  "redhat.telemetry.enabled": true,
-  "editor.formatOnSave": true,
-  "eslint.alwaysShowStatus": true,
+  "[go]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "go.toolsManagement.autoUpdate": true,
   "editor.fontSize": 14.5
 }
