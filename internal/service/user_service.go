@@ -5,13 +5,13 @@ import (
 	"doit/internal/data/db"
 	"doit/internal/model"
 	"doit/pkg/database"
+	passwordHash "doit/pkg/password_hash"
 	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // Sentinel errors for user service
@@ -49,7 +49,7 @@ func (s *UserService) CreateUser(ctx context.Context, input model.CreateUserInpu
 	}
 
 	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	hashedPassword, err := passwordHash.HashPassword([]byte(input.Password))
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
@@ -135,7 +135,7 @@ func (s *UserService) AuthenticateUser(ctx context.Context, input model.LoginInp
 	// }
 
 	// Verify password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
+	if err := passwordHash.ComparePassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
 		return nil, ErrInvalidCredentials
 	}
 
@@ -180,7 +180,7 @@ func (s *UserService) UpdateUser(ctx context.Context, userID uuid.UUID, input mo
 // UpdateUserPassword updates a user's password
 func (s *UserService) UpdateUserPassword(ctx context.Context, userID uuid.UUID, newPassword string) error {
 	// Hash new password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	hashedPassword, err := passwordHash.HashPassword([]byte(newPassword))
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
