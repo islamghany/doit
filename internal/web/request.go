@@ -75,6 +75,10 @@ func GetQueryInt(r *http.Request, key string, defaultValue int) int {
 	return num
 }
 
+func GetHeader(r *http.Request, key string) string {
+	return r.Header.Get(key)
+}
+
 // Helper: Extract client IP address
 func GetClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header first (proxy/load balancer)
