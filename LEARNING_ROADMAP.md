@@ -36,13 +36,13 @@
 
 **Implementation Tasks:**
 
-- [ ] Add `password_hash` to users table (migration)
-- [ ] Create password hashing utility
-- [ ] Implement JWT token generation and validation
+- [x] Add `password_hash` to users table (migration)
+- [x] Create password hashing utility
+- [x] Implement JWT token generation and validation
 - [ ] Create `/auth/register` endpoint
-- [ ] Create `/auth/login` endpoint
-- [ ] Create `/auth/refresh` endpoint (refresh token rotation)
-- [ ] Add JWT middleware to protect todo routes
+- [x] Create `/auth/login` endpoint
+- [x] Create `/auth/refresh` endpoint (refresh token rotation)
+- [x] Add JWT middleware to protect todo routes
 - [ ] Implement user ownership (users can only CRUD their own todos)
 - [ ] Add password strength validation
 - [ ] Implement rate limiting on auth endpoints (prevent brute force)
@@ -94,8 +94,8 @@
 
 - [ ] Add `/health` endpoint (liveness probe)
 - [ ] Add `/ready` endpoint (readiness probe - checks DB, Redis, etc.)
-- [ ] Implement graceful shutdown handler
-- [ ] Add timeout for in-flight requests
+- [x] Implement graceful shutdown handler
+- [x] Add timeout for in-flight requests
 - [ ] Test shutdown behavior with active connections
 - [ ] Add startup probe logic
 

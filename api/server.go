@@ -1,11 +1,13 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"doit/api/v1/auth"
 	"doit/internal/config"
 	"doit/internal/middlewares"
+	"doit/internal/model"
 	"doit/internal/service"
 	"doit/internal/token"
 	"doit/internal/web"
@@ -20,17 +22,18 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool)
 		return nil, err
 	}
 
-	// Middlewares
-	errorMiddleware := middlewares.ErrorMiddleware(logger)
-
-	// Web App
-	app := web.NewApp(errorMiddleware)
-
 	// Services
 	userService := service.NewUserService(dbPool)
 	tokenService := service.NewTokenService(dbPool, tokenMaker,
 		cfg.JWT.AccessTokenExp,
 		cfg.JWT.RefreshTokenExp)
+
+	// Middlewares
+	errorMiddleware := middlewares.ErrorMiddleware(logger)
+	authMiddleware := middlewares.AuthMiddleware(tokenService)
+
+	// Web App
+	app := web.NewApp(errorMiddleware)
 
 	// Handlers
 	authHandler := auth.NewHandler(logger, userService, tokenService, cfg)
@@ -39,8 +42,12 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool)
 	auth.RegisterRoutes(app, authHandler)
 
 	app.Handle("GET", "/healthcheck", func(w http.ResponseWriter, r *http.Request) error {
-		return web.RespondOK(w, r, map[string]string{"status": "ok"})
-	})
+		user := model.GetUserContext(r.Context())
+		if user == nil {
+			return web.NewError(errors.New("user not found"), http.StatusUnauthorized)
+		}
+		return web.RespondOK(w, r, map[string]string{"status": "ok", "user": user.Email, "user_id": user.ID.String()})
+	}, authMiddleware)
 
 	return app, nil
 }
