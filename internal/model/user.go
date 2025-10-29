@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,7 +18,7 @@ type User struct {
 	LastLoginAt   *time.Time             `json:"last_login_at,omitempty"`
 	CreatedAt     time.Time              `json:"created_at"`
 	UpdatedAt     time.Time              `json:"updated_at"`
-	TokenVersion  int32                   `json:"token_version,omitempty"`
+	TokenVersion  int32                  `json:"token_version,omitempty"`
 }
 
 func (u *User) IsUserActive() bool {
@@ -55,4 +56,25 @@ type UserFilter struct {
 	Email  *string `json:"email,omitempty"`
 	Limit  int32   `json:"limit" validate:"min=1,max=100"`
 	Offset int32   `json:"offset" validate:"min=0"`
+}
+
+// ================================
+// User Context
+
+type userContextKey string
+
+const (
+	UserContextKey userContextKey = "user"
+)
+
+func SetUserContext(ctx context.Context, user *User) context.Context {
+	return context.WithValue(ctx, UserContextKey, user)
+}
+
+func GetUserContext(ctx context.Context) *User {
+	user, ok := ctx.Value(UserContextKey).(*User)
+	if !ok {
+		return nil
+	}
+	return user
 }
