@@ -27,6 +27,7 @@ type CustomClaims struct {
 	ID       string `json:"id"`       // JTI - JWT ID
 	UserID   string `json:"user_id"`  // Subject user ID
 	Email    string `json:"email"`    // User email
+	Role     string `json:"role"`     // User role
 	Username string `json:"username"` // Username
 	Version  int    `json:"version"`  // Token version
 	jwt.RegisteredClaims
@@ -53,6 +54,7 @@ func (t *JWTToken) CreateToken(params TokenParams) (string, *Payload, error) {
 		UserID:   payload.UserID.String(),
 		Email:    payload.Email,
 		Username: payload.Username,
+		Role:     payload.Role,
 		Version:  payload.Version,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        payload.ID.String(), // JTI
