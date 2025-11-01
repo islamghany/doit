@@ -15,6 +15,7 @@ var (
 // TokenParams represents the parameters for creating a token.
 type TokenParams struct {
 	UserID   uuid.UUID
+	Role     string
 	Email    string
 	Username string
 	Version  int
@@ -33,6 +34,7 @@ type Payload struct {
 	UserID    uuid.UUID `json:"user_id"`    // Subject user ID
 	Email     string    `json:"email"`      // User email
 	Username  string    `json:"username"`   // Username
+	Role      string    `json:"role"`       // User role
 	Version   int       `json:"version"`    // Token version for invalidation
 	IssuedAt  time.Time `json:"issued_at"`  // Token issue time
 	ExpiredAt time.Time `json:"expired_at"` // Token expiration time
@@ -47,6 +49,7 @@ func NewPayload(
 		UserID:    params.UserID,
 		Email:     params.Email,
 		Username:  params.Username,
+		Role:      params.Role,
 		Version:   params.Version,
 		IssuedAt:  time.Now(),
 		ExpiredAt: time.Now().Add(params.Duration),
