@@ -25,6 +25,37 @@ func NewHandler(log *logger.Logger, userService *service.UserService, tokenServi
 	return &Handler{log: log, userService: userService, tokenService: tokenService, config: config}
 }
 
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	var input RegisterInput
+	if err := web.Decode(w, r, &input); err != nil {
+		return web.NewError(err, http.StatusBadRequest)
+	}
+
+	// Create user
+	user, err := h.userService.CreateUser(ctx, model.CreateUserInput{
+		Email:    input.Email,
+		Username: input.Username,
+		Password: input.Password,
+		Role:     model.UserRole(input.Role),
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrDuplicateEmail):
+			return web.NewError(errors.New("email already exists"), http.StatusBadRequest)
+		case errors.Is(err, service.ErrDuplicateUsername):
+			return web.NewError(errors.New("username already exists"), http.StatusBadRequest)
+		case errors.Is(err, service.ErrFailedToCreateUser):
+			return web.NewError(errors.New("failed to create user"), http.StatusInternalServerError)
+		default:
+			return web.NewError(err, http.StatusInternalServerError)
+		}
+	}
+
+	return web.RespondOK(w, r, user)
+}
+
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
