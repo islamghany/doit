@@ -26,14 +26,14 @@ func TestTodoService_CreateTodo(t *testing.T) {
 	// Setup test data
 	userID := uuid.New()
 	todoID := uuid.New()
-	
+
 	input := model.CreateTodoInput{
-		UserID: userID,
-		Title: "Test Todo",
+		UserID:      userID,
+		Title:       "Test Todo",
 		Description: "This is a test todo",
-		Priority: model.TodoPriorityMedium,
-		Tags: []string{"test", "todo"},
-		Metadata: map[string]interface{}{"test": "test"},
+		Priority:    model.TodoPriorityMedium,
+		Tags:        []string{"test", "todo"},
+		Metadata:    map[string]interface{}{"test": "test"},
 	}
 
 	// Setup expectation
@@ -57,7 +57,6 @@ func TestTodoService_CreateTodo(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, todo)
 	require.Equal(t, todoID, todo.ID)
-
 }
 
 // TestTodoService_GetTodoByID tests GetTodoByID with mock
@@ -77,13 +76,13 @@ func TestTodoService_GetTodoByID(t *testing.T) {
 		t.Fatalf("failed to marshal metadata: %v", err)
 	}
 	expectedTodo := db.Todo{
-		ID: todoID,
-		UserID: userID,
-		Title: "Test Todo",
+		ID:          todoID,
+		UserID:      userID,
+		Title:       "Test Todo",
 		Description: &description,
-		Priority: db.TodoPriorityMedium,
-		Tags: []string{"test", "todo"},
-		Metadata: metadataJSON,
+		Priority:    db.TodoPriorityMedium,
+		Tags:        []string{"test", "todo"},
+		Metadata:    metadataJSON,
 	}
 
 	// Setup expectation
@@ -94,7 +93,7 @@ func TestTodoService_GetTodoByID(t *testing.T) {
 
 	// Test implementation would use the mock
 	svc := NewTodoServiceWithQuerier(mockQuerier)
-	todo, err := svc.GetTodoByID(context.Background(), todoID)
+	todo, err := svc.GetTodoByID(context.Background(), todoID, userID)
 
 	require.NoError(t, err)
 	require.NotNil(t, todo)
@@ -126,22 +125,22 @@ func TestTodoService_ListUserTodos(t *testing.T) {
 	}
 	expectedTodos := []db.Todo{
 		{
-			ID: uuid.New(),
-			UserID: userID,
-			Title: "Test Todo",
+			ID:          uuid.New(),
+			UserID:      userID,
+			Title:       "Test Todo",
 			Description: &description,
-			Priority: db.TodoPriorityMedium,
-			Tags: []string{"test", "todo"},
-			Metadata: metadataJSON,
+			Priority:    db.TodoPriorityMedium,
+			Tags:        []string{"test", "todo"},
+			Metadata:    metadataJSON,
 		},
 		{
-			ID: uuid.New(),
-			UserID: userID,
-			Title: "Test Todo 2",
+			ID:          uuid.New(),
+			UserID:      userID,
+			Title:       "Test Todo 2",
 			Description: &description,
-			Priority: db.TodoPriorityMedium,
-			Tags: []string{"test", "todo"},
-			Metadata: metadataJSON,
+			Priority:    db.TodoPriorityMedium,
+			Tags:        []string{"test", "todo"},
+			Metadata:    metadataJSON,
 		},
 	}
 
@@ -149,7 +148,7 @@ func TestTodoService_ListUserTodos(t *testing.T) {
 	mockQuerier.EXPECT().
 		ListTodosByUser(gomock.Any(), db.ListTodosByUserParams{
 			UserID: userID,
-			Limit: limit,
+			Limit:  limit,
 			Offset: offset,
 		}).
 		Return(expectedTodos, nil).
@@ -171,4 +170,4 @@ func TestTodoService_ListUserTodos(t *testing.T) {
 		require.Equal(t, expectedTodos[i].Tags, todo.Tags)
 		require.Equal(t, metadata, todo.Metadata)
 	}
-}	
+}

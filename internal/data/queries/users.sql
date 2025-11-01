@@ -4,9 +4,10 @@ INSERT INTO users (
         email,
         username,
         password_hash,
-        metadata
+        metadata,
+        role
     )
-VALUES ($1, $2, $3, $4, $5)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 -- name: GetUserByID :one
 SELECT *
@@ -30,7 +31,8 @@ UPDATE users
 SET email = COALESCE(sqlc.narg('email'), email),
     username = COALESCE(sqlc.narg('username'), username),
     is_active = COALESCE(sqlc.narg('is_active'), is_active),
-    metadata = COALESCE(sqlc.narg('metadata'), metadata)
+    metadata = COALESCE(sqlc.narg('metadata'), metadata),
+    role = COALESCE(sqlc.narg('role'), role)
 WHERE id = $1
 RETURNING *;
 -- name: UpdateUserPassword :exec

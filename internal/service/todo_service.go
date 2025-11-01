@@ -2,15 +2,23 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+
 	"doit/internal/data/db"
 	"doit/internal/model"
 	"doit/pkg/database"
-	"encoding/json"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+)
+
+// TodoService errors
+var (
+	ErrTodoNotFound     = errors.New("todo not found")
+	ErrTodoUnauthorized = errors.New("unauthorized: todo does not belong to user")
 )
 
 // TodoService handles all todo-related business logic
@@ -31,6 +39,7 @@ func NewTodoServiceWithQuerier(querier db.Querier) *TodoService {
 		querier: querier,
 	}
 }
+
 // CreateTodo creates a new todo
 func (s *TodoService) CreateTodo(ctx context.Context, input model.CreateTodoInput) (*model.Todo, error) {
 	if err := s.validateCreateTodoInput(input); err != nil {
@@ -85,20 +94,25 @@ func (s *TodoService) CreateTodo(ctx context.Context, input model.CreateTodoInpu
 		DueDate:     dueDate,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create todo: %w", err)
+		return nil, ErrTodoNotFound
 	}
 
 	return s.toTodoModel(todo), nil
 }
 
 // GetTodoByID retrieves a todo by ID
-func (s *TodoService) GetTodoByID(ctx context.Context, todoID uuid.UUID) (*model.Todo, error) {
+func (s *TodoService) GetTodoByID(ctx context.Context, todoID uuid.UUID, userID uuid.UUID) (*model.Todo, error) {
 	todo, err := s.querier.GetTodoByID(ctx, todoID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("todo not found")
+			return nil, ErrTodoNotFound
 		}
 		return nil, fmt.Errorf("failed to get todo: %w", err)
+	}
+
+	// Verify ownership
+	if err = VerifyOwnership(todo.UserID, userID, "todo"); err != nil {
+		return nil, err
 	}
 
 	return s.toTodoModel(todo), nil
@@ -134,7 +148,20 @@ func (s *TodoService) ListTodosByStatus(ctx context.Context, userID uuid.UUID, s
 }
 
 // UpdateTodo updates a todo
-func (s *TodoService) UpdateTodo(ctx context.Context, todoID uuid.UUID, input model.UpdateTodoInput) (*model.Todo, error) {
+func (s *TodoService) UpdateTodo(ctx context.Context, todoID uuid.UUID, userID uuid.UUID, input model.UpdateTodoInput) (*model.Todo, error) {
+	// First, verify ownership
+	existingTodo, err := s.querier.GetTodoByID(ctx, todoID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrTodoNotFound
+		}
+		return nil, fmt.Errorf("failed to get todo: %w", err)
+	}
+
+	if err = VerifyOwnership(existingTodo.UserID, userID, "todo"); err != nil {
+		return nil, err
+	}
+
 	// Build update params
 	params := db.UpdateTodoParams{
 		ID: todoID,

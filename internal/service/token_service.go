@@ -55,6 +55,7 @@ func (s *TokenService) CreateTokenPair(ctx context.Context, user model.User, dev
 		UserID:   user.ID,
 		Email:    user.Email,
 		Username: user.Username,
+		Role:     string(user.Role),
 		Version:  int(user.TokenVersion),
 		Duration: time.Duration(s.accessTokenDuration) * time.Second,
 	})
@@ -67,6 +68,7 @@ func (s *TokenService) CreateTokenPair(ctx context.Context, user model.User, dev
 		UserID:   user.ID,
 		Email:    user.Email,
 		Username: user.Username,
+		Role:     string(user.Role),
 		Version:  int(user.TokenVersion),
 		Duration: time.Duration(s.refreshTokenDuration) * time.Second,
 	})
@@ -191,6 +193,7 @@ func (s *TokenService) RefreshAccessToken(ctx context.Context, refreshTokenStrin
 		UserID:   user.ID,
 		Email:    user.Email,
 		Username: user.Username,
+		Role:     string(user.Role),
 		Version:  int(*user.TokenVersion),
 		Duration: 15 * time.Minute,
 	})

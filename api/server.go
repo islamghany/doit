@@ -49,5 +49,13 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool)
 		return web.RespondOK(w, r, map[string]string{"status": "ok", "user": user.Email, "user_id": user.ID.String()})
 	}, authMiddleware)
 
+	app.Handle("GET", "/admin", func(w http.ResponseWriter, r *http.Request) error {
+		user := model.GetUserContext(r.Context())
+		if user == nil {
+			return web.NewError(errors.New("user not found"), http.StatusUnauthorized)
+		}
+		return web.RespondOK(w, r, map[string]string{"status": "ok", "user": user.Email, "user_id": user.ID.String()})
+	}, authMiddleware, middlewares.RequireAdmin())
+
 	return app, nil
 }
