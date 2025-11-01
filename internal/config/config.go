@@ -6,6 +6,14 @@ import (
 	"github.com/islamghany/enfl"
 )
 
+type Environment string
+
+const (
+	EnvDevelopment Environment = "development"
+	EnvStaging     Environment = "staging"
+	EnvProduction  Environment = "production"
+)
+
 type DatabaseConfig struct {
 	Name            string `env:"NAME" flag:"db_name" required:"true"`
 	User            string `env:"USER" flag:"db_user" required:"true"`
@@ -16,24 +24,6 @@ type DatabaseConfig struct {
 	MaxOpenConns    int    `env:"MAX_OPEN_CONNS" default:"25"`
 	MaxIdleConns    int    `env:"MAX_IDLE_CONNS" default:"25"`
 	ConnMaxLifetime int    `env:"CONN_MAX_LIFETIME" default:"300"` // 5 minutes in seconds
-}
-
-// Add helper method
-func (d *DatabaseConfig) DSN() string {
-	sslMode := "require"
-	if d.DisableTLS {
-		sslMode = "disable"
-	}
-
-	return fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		d.Host,
-		d.Port,
-		d.User,
-		d.Password,
-		d.Name,
-		sslMode,
-	)
 }
 
 type RedisConfig struct {
@@ -59,14 +49,26 @@ type ServerConfig struct {
 }
 
 type AppConfig struct {
-	Environment string `env:"ENVIRONMENT" flag:"environment" default:"development"`
-	LogLevel    string `env:"LOG_LEVEL" flag:"log_level" default:"info"`
+	Environment Environment `env:"ENVIRONMENT" flag:"environment" default:"development"`
+	LogLevel    string      `env:"LOG_LEVEL" flag:"log_level" default:"info"`
 }
+
+type SecurityConfig struct {
+	EnableCORS        bool     `env:"ENABLE_CORS" flag:"enable_cors" default:"true"`
+	AllowedOrigins    []string `env:"ALLOWED_ORIGINS" flag:"allowed_origins" default:"*"`
+	RateLimitEnabled  bool     `env:"RATE_LIMIT_ENABLED" flag:"rate_limit_enabled" default:"true"`
+	MaxRequestsPerMin int      `env:"MAX_REQUESTS_PER_MIN" flag:"max_requests_per_min" default:"100"`
+	EnableTLS         bool     `env:"ENABLE_TLS" flag:"enable_tls" default:"false"`
+	TLSCertFile       string   `env:"TLS_CERT_FILE" flag:"tls_cert_file"`
+	TLSKeyFile        string   `env:"TLS_KEY_FILE" flag:"tls_key_file"`
+}
+
 type Config struct {
 	Server   ServerConfig   `prefix:"SERVER_"`
 	App      AppConfig      `prefix:"APP_"`
 	Database DatabaseConfig `prefix:"DB_"`
 	JWT      JWTConfig      `prefix:"JWT_"`
+	Security SecurityConfig `prefix:"SECURITY_"`
 	// Redis    RedisConfig    `prefix:"REDIS_"`
 }
 
@@ -83,7 +85,7 @@ func (c *Config) Validate() error {
 		"staging":     true,
 		"production":  true,
 	}
-	if !validEnvs[c.App.Environment] {
+	if !validEnvs[string(c.App.Environment)] {
 		return fmt.Errorf("invalid environment: %s (must be development, staging, or production)", c.App.Environment)
 	}
 
@@ -117,7 +119,6 @@ func (c *Config) DevPrint() {
 		// Print the config in a pretty format
 		fmt.Printf("%+v", c)
 	}
-
 }
 
 func LoadConfig() (*Config, error) {

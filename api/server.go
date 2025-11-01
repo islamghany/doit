@@ -29,17 +29,23 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool)
 		cfg.JWT.RefreshTokenExp)
 
 	// Middlewares
+	corsMiddleware := middlewares.CORSMiddleware(cfg)
+	panicMiddleware := middlewares.PanicMiddleware()
 	errorMiddleware := middlewares.ErrorMiddleware(logger)
 	authMiddleware := middlewares.AuthMiddleware(tokenService)
+	securityHeadersMiddleware := middlewares.SecurityHeaders()
 
 	// Web App
-	app := web.NewApp(errorMiddleware)
+	app := web.NewApp(panicMiddleware, errorMiddleware, securityHeadersMiddleware, corsMiddleware)
 
 	// Handlers
 	authHandler := auth.NewHandler(logger, userService, tokenService, cfg)
 
 	// Routes
 	auth.RegisterRoutes(app, authHandler)
+	app.Handle("GET", "/public", func(w http.ResponseWriter, r *http.Request) error {
+		return web.RespondOK(w, r, map[string]string{"status": "ok", "message": "Hello, World!"})
+	})
 
 	app.Handle("GET", "/healthcheck", func(w http.ResponseWriter, r *http.Request) error {
 		user := model.GetUserContext(r.Context())
