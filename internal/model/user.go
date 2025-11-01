@@ -43,31 +43,32 @@ func (u *User) IsUserEmailVerified() bool {
 
 // CreateUserInput represents input for creating a user
 type CreateUserInput struct {
-	Email    string                 `json:"email" validate:"required,email"`
-	Username string                 `json:"username" validate:"required,min=3,max=50"`
-	Password string                 `json:"password" validate:"required,min=8"`
+	Email    string                 `json:"email"`
+	Username string                 `json:"username"`
+	Password string                 `json:"password"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Role     UserRole               `json:"role"`
 }
 
 // UpdateUserInput represents input for updating a user
 type UpdateUserInput struct {
-	Email    *string                `json:"email,omitempty" validate:"omitempty,email"`
-	Username *string                `json:"username,omitempty" validate:"omitempty,min=3,max=50"`
+	Email    *string                `json:"email,omitempty"`
+	Username *string                `json:"username,omitempty"`
 	IsActive *bool                  `json:"is_active,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // LoginInput represents credentials for authentication
 type LoginInput struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 // UserFilter represents filtering options for listing users
 type UserFilter struct {
 	Email  *string `json:"email,omitempty"`
-	Limit  int32   `json:"limit" validate:"min=1,max=100"`
-	Offset int32   `json:"offset" validate:"min=0"`
+	Limit  int32   `json:"limit"`
+	Offset int32   `json:"offset"`
 }
 
 // ================================

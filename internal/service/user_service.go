@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"doit/internal/data/db"
 	"doit/internal/model"
 	"doit/pkg/database"
 	passwordHash "doit/pkg/password_hash"
+	"doit/pkg/validator"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -20,6 +22,8 @@ var (
 	ErrDuplicateEmail     = errors.New("email already exists")
 	ErrInvalidInput       = errors.New("invalid input")
 	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrDuplicateUsername  = errors.New("username already exists")
+	ErrFailedToCreateUser = errors.New("failed to create user")
 )
 
 // UserService handles all user-related business logic
@@ -49,6 +53,11 @@ func (s *UserService) CreateUser(ctx context.Context, input model.CreateUserInpu
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
+	// validate password strength
+	if err := validator.ValidatePasswordStrength(input.Password, validator.DefaultPasswordStrength); err != nil {
+		return nil, fmt.Errorf("password validation failed: %w", err)
+	}
+
 	// Hash password
 	hashedPassword, err := passwordHash.HashPassword([]byte(input.Password))
 	if err != nil {
@@ -72,8 +81,16 @@ func (s *UserService) CreateUser(ctx context.Context, input model.CreateUserInpu
 		Username:     input.Username,
 		PasswordHash: string(hashedPassword),
 		Metadata:     metadataJSON,
+		Role:         string(input.Role),
 	})
 	if err != nil {
+		// check if the error is a duplicate email or username
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint \"users_email_key\"") {
+			return nil, ErrDuplicateEmail
+		}
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint \"users_username_key\"") {
+			return nil, ErrDuplicateUsername
+		}
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
