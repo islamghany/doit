@@ -39,12 +39,13 @@
 - [x] Add `password_hash` to users table (migration)
 - [x] Create password hashing utility
 - [x] Implement JWT token generation and validation
-- [ ] Create `/auth/register` endpoint
+- [x] Create `/auth/register` endpoint
 - [x] Create `/auth/login` endpoint
 - [x] Create `/auth/refresh` endpoint (refresh token rotation)
 - [x] Add JWT middleware to protect todo routes
-- [ ] Implement user ownership (users can only CRUD their own todos)
-- [ ] Add password strength validation
+- [x] Implement user ownership (users can only CRUD their own todos)
+- [x] Add password strength validation
+- [x] Ensure OWASP Top 10 security best practices are implemented
 - [ ] Implement rate limiting on auth endpoints (prevent brute force)
 
 **Why this first:** Almost every real application needs authentication. It touches all layers (API → Service → Database) and teaches security fundamentals.
