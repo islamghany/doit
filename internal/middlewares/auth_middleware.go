@@ -38,6 +38,7 @@ func AuthMiddleware(tokenService *service.TokenService) web.MiddleWare {
 				Email:        payload.Email,
 				Username:     payload.Username,
 				TokenVersion: int32(payload.Version),
+				Role:         model.UserRole(payload.Role),
 			})
 			r = r.WithContext(ctx)
 			return handler(w, r)

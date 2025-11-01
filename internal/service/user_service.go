@@ -2,13 +2,14 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+
 	"doit/internal/data/db"
 	"doit/internal/model"
 	"doit/pkg/database"
 	passwordHash "doit/pkg/password_hash"
-	"encoding/json"
-	"errors"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -16,8 +17,8 @@ import (
 
 // Sentinel errors for user service
 var (
-	ErrDuplicateEmail = errors.New("email already exists")
-	ErrInvalidInput   = errors.New("invalid input")
+	ErrDuplicateEmail     = errors.New("email already exists")
+	ErrInvalidInput       = errors.New("invalid input")
 	ErrInvalidCredentials = errors.New("invalid credentials")
 )
 
@@ -283,6 +284,7 @@ func toUserModel(user db.User) *model.User {
 		CreatedAt:     user.CreatedAt,
 		UpdatedAt:     user.UpdatedAt,
 		TokenVersion:  *user.TokenVersion,
+		Role:          model.UserRole(user.Role),
 	}
 
 	// Handle nullable last login
