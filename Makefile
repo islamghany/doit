@@ -16,6 +16,11 @@ help:
 	@echo "🗄️  Database:"
 	@echo "  migrate-up     - Run database migrations"
 	@echo "  migrate-down   - Rollback database migrations"
+	@echo "  migrate-down-last - Rollback last database migration"
+	@echo "  migrate-up-last - Run last database migration"
+	@echo "  migrate-up-to - Run database migrations up to a specific version"
+	@echo "  migrate-down-to - Rollback database migrations down to a specific version"
+	@echo "  migrate-version - Show current database migration version"
 	@echo "  migrate-status - Show migration status"
 	@echo "  migrate-fix    - Fix dirty migration (usage: make migrate-fix version=N)"
 	@echo "  migrate-reset  - Reset migration tracking (keeps data)"
@@ -90,6 +95,18 @@ migrate-up:
 
 migrate-down:
 	migrate -path internal/data/migrations -database "$(DB_URL)" down
+
+migrate-down-last:
+	migrate -path internal/data/migrations -database "$(DB_URL)" down 1
+
+migrate-up-last:
+	migrate -path internal/data/migrations -database "$(DB_URL)" up 1
+
+migrate-up-to:
+	migrate -path internal/data/migrations -database "$(DB_URL)" up $(version)
+
+migrate-down-to:
+	migrate -path internal/data/migrations -database "$(DB_URL)" down $(version)
 
 migrate-force:
 	migrate -path internal/data/migrations -database "$(DB_URL)" force $(version)

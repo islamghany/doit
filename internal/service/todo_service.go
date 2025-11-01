@@ -9,6 +9,7 @@ import (
 	"doit/internal/data/db"
 	"doit/internal/model"
 	"doit/pkg/database"
+	"doit/pkg/validator"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -333,6 +334,14 @@ func (s *TodoService) CountUserTodos(ctx context.Context, userID uuid.UUID) (int
 
 // SearchTodosByTitle searches todos by title
 func (s *TodoService) SearchTodosByTitle(ctx context.Context, userID uuid.UUID, query string, limit int32) ([]*model.Todo, error) {
+	// validate search query
+	if err := validator.ValidateSearchQuery(query); err != nil {
+		return nil, fmt.Errorf("invalid search query: %w", err)
+	}
+
+	// sanitize search query
+	query = validator.SanitizeString(query, 100)
+
 	todos, err := s.querier.SearchTodosByTitle(ctx, db.SearchTodosByTitleParams{
 		UserID:  userID,
 		Column2: &query,
