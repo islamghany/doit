@@ -46,6 +46,7 @@
 - [x] Implement user ownership (users can only CRUD their own todos)
 - [x] Add password strength validation
 - [x] Ensure OWASP Top 10 security best practices are implemented
+- [x] Add CORS middleware and security headers
 - [ ] Implement rate limiting on auth endpoints (prevent brute force)
 
 **Why this first:** Almost every real application needs authentication. It touches all layers (API → Service → Database) and teaches security fundamentals.
