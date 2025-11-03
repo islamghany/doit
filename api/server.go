@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"doit/api/v1/auth"
+	"doit/internal/cache"
 	"doit/internal/config"
 	"doit/internal/middlewares"
 	"doit/internal/model"
@@ -15,7 +16,7 @@ import (
 	"doit/pkg/logger"
 )
 
-func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool) (http.Handler, error) {
+func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool, cache cache.Cache) (http.Handler, error) {
 	// Helpers
 	tokenMaker, err := token.NewJWTToken(cfg.JWT.Secret)
 	if err != nil {

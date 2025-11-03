@@ -69,7 +69,7 @@ type Config struct {
 	Database DatabaseConfig `prefix:"DB_"`
 	JWT      JWTConfig      `prefix:"JWT_"`
 	Security SecurityConfig `prefix:"SECURITY_"`
-	// Redis    RedisConfig    `prefix:"REDIS_"`
+	Redis    RedisConfig    `prefix:"REDIS_"`
 }
 
 // Validate checks if the configuration is valid
