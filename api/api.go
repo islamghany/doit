@@ -2,20 +2,21 @@ package api
 
 import (
 	"context"
-	"doit/internal/config"
-	"doit/pkg/database"
-	"doit/pkg/logger"
-	"doit/pkg/retry"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"doit/internal/cache"
+	"doit/internal/config"
+	"doit/pkg/database"
+	"doit/pkg/logger"
+	"doit/pkg/retry"
 )
 
 func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
-
 	// Initialize database with retry logic
 	dbPool, err := retry.ConnectWithRetry(ctx, retry.DefaultRetryConfig(), func(ctx context.Context) (*database.Pool, error) {
 		return database.New(ctx, database.Config{
@@ -42,8 +43,23 @@ func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
 	)
 	defer dbPool.Close()
 
+	// Initialize cache with retry logic
+
+	opts := &cache.RedisOptions{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.Database,
+		PoolSize: 10,
+	}
+	cache, err := cache.NewRedisCache(opts)
+	if err != nil {
+		logger.Error(ctx, "Failed to connect to cache", "error", err)
+		return fmt.Errorf("failed to connect to cache: %w", err)
+	}
+	defer cache.Close()
+
 	// Starting the HTTP server with graceful shutdown
-	srv, err := NewServer(logger, cfg, dbPool)
+	srv, err := NewServer(logger, cfg, dbPool, cache)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
 	}
