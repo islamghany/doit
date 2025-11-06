@@ -7,6 +7,7 @@ import (
 	"doit/api/v1/auth"
 	"doit/internal/cache"
 	"doit/internal/config"
+	"doit/internal/limiter"
 	"doit/internal/middlewares"
 	"doit/internal/model"
 	"doit/internal/service"
@@ -22,6 +23,8 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool,
 	if err != nil {
 		return nil, err
 	}
+	// Rate Limiter
+	rateLimiter := limiter.NewRateLimiter(cache, logger)
 
 	// Services
 	userService := service.NewUserService(dbPool)
@@ -43,7 +46,7 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool,
 	authHandler := auth.NewHandler(logger, userService, tokenService, cfg)
 
 	// Routes
-	auth.RegisterRoutes(app, authHandler)
+	auth.RegisterRoutes(app, authHandler, rateLimiter)
 	app.Handle("GET", "/public", func(w http.ResponseWriter, r *http.Request) error {
 		return web.RespondOK(w, r, map[string]string{"status": "ok", "message": "Hello, World!"})
 	})
