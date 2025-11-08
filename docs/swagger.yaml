@@ -1,0 +1,354 @@
+definitions:
+  api_v1_auth.ErrorResponse:
+    description: Standard error response format
+    properties:
+      code:
+        description: HTTP status code
+        example: 400
+        type: integer
+      error:
+        description: Error message describing what went wrong
+        example: validation error
+        type: string
+      fields:
+        description: Field-specific validation errors (optional)
+        type: object
+    type: object
+  api_v1_auth.LoginInput:
+    description: User login request payload
+    properties:
+      email:
+        description: User's email address
+        example: john.doe@example.com
+        type: string
+      password:
+        description: User's password
+        example: SecurePass123!
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  api_v1_auth.LoginResponse:
+    description: User login response with tokens
+    properties:
+      tokens:
+        $ref: '#/definitions/doit_internal_model.TokenPair'
+      user:
+        type: object
+    type: object
+  api_v1_auth.MessageResponse:
+    description: Simple message response (used for logout, delete, etc.)
+    properties:
+      message:
+        description: Response message
+        example: logged out successfully
+        type: string
+    type: object
+  api_v1_auth.RefreshResponse:
+    description: Response containing new access token
+    properties:
+      access_token:
+        description: New JWT access token
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      expires_in:
+        description: Access token expiration time in seconds
+        example: 900
+        type: integer
+      refresh_token:
+        description: New refresh token (rotation)
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      token_type:
+        description: Token type (always "Bearer")
+        example: Bearer
+        type: string
+    type: object
+  api_v1_auth.RegisterInput:
+    description: User registration request payload
+    properties:
+      confirm_password:
+        description: Password confirmation (must match password field)
+        example: SecurePass123!
+        type: string
+      email:
+        description: User's email address (must be unique)
+        example: jane.smith@example.com
+        type: string
+      password:
+        description: Password (minimum 8 characters, should include uppercase, lowercase,
+          numbers, and special characters)
+        example: SecurePass123!
+        minLength: 8
+        type: string
+      role:
+        description: 'User role: user (default), admin, or moderator'
+        enum:
+        - user
+        - admin
+        - moderator
+        example: user
+        type: string
+      username:
+        description: Unique username (max 50 characters)
+        example: janesmith
+        maxLength: 50
+        type: string
+    required:
+    - confirm_password
+    - email
+    - password
+    - role
+    - username
+    type: object
+  doit_internal_model.TokenPair:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        description: seconds
+        type: integer
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+    type: object
+  doit_internal_model.User:
+    description: User account information (password field is never included in responses)
+    properties:
+      created_at:
+        description: Account creation timestamp
+        example: "2025-11-08T10:00:00Z"
+        type: string
+      email:
+        description: User's email address
+        example: john.doe@example.com
+        type: string
+      email_verified:
+        description: Whether the user's email has been verified
+        example: false
+        type: boolean
+      id:
+        description: Unique user identifier (UUID v4)
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      is_active:
+        description: Whether the user account is active
+        example: true
+        type: boolean
+      last_login_at:
+        description: Last successful login timestamp
+        example: "2025-11-08T10:30:00Z"
+        type: string
+      metadata:
+        description: Additional metadata (flexible key-value storage)
+        type: object
+      role:
+        allOf:
+        - $ref: '#/definitions/doit_internal_model.UserRole'
+        description: User's role (user, admin, moderator)
+        enum:
+        - user
+        - admin
+        - moderator
+        example: user
+      token_version:
+        description: Token version for refresh token rotation (used internally for
+          security)
+        example: 1
+        type: integer
+      updated_at:
+        description: Last update timestamp
+        example: "2025-11-08T10:00:00Z"
+        type: string
+      username:
+        description: User's unique username
+        example: johndoe
+        type: string
+    type: object
+  doit_internal_model.UserRole:
+    enum:
+    - user
+    - admin
+    - moderator
+    type: string
+    x-enum-comments:
+      UserRoleAdmin: Full system access
+      UserRoleModerator: Limited admin access
+      UserRoleUser: Regular user
+    x-enum-descriptions:
+    - Regular user
+    - Full system access
+    - Limited admin access
+    x-enum-varnames:
+    - UserRoleUser
+    - UserRoleAdmin
+    - UserRoleModerator
+info:
+  contact: {}
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Authenticate user credentials and receive JWT access token and refresh token. The access token is short-lived (15 minutes) and used for API requests. The refresh token is long-lived (7 days) and used to obtain new access tokens.
+        Rate limit: 5 requests per minute per IP address
+      parameters:
+      - description: User login credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/api_v1_auth.LoginInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful with user info and tokens
+          schema:
+            $ref: '#/definitions/api_v1_auth.LoginResponse'
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+        "401":
+          description: Invalid credentials (wrong email or password)
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+        "429":
+          description: Rate limit exceeded
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+      summary: Authenticate and login user
+      tags:
+      - Authentication
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Revoke the current refresh token, logging out the user from this
+        specific device/session. Other active sessions remain valid.
+      parameters:
+      - description: Refresh token to revoke
+        in: header
+        name: X-Refresh-Token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logged out successfully
+          schema:
+            $ref: '#/definitions/api_v1_auth.MessageResponse'
+        "400":
+          description: Missing refresh token header
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+      summary: Logout user (single device)
+      tags:
+      - Authentication
+  /auth/logout/all:
+    post:
+      consumes:
+      - application/json
+      description: Revoke all refresh tokens for the authenticated user, logging them
+        out from all devices and sessions. Use this when account security is compromised.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logged out from all devices successfully
+          schema:
+            $ref: '#/definitions/api_v1_auth.MessageResponse'
+        "401":
+          description: Unauthorized - missing or invalid access token
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+      security:
+      - bearer: []
+      summary: Logout user from all devices
+      tags:
+      - Authentication
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Exchange a valid refresh token for a new access token and refresh token pair. This implements refresh token rotation for enhanced security - the old refresh token becomes invalid after use.
+        Security: If an already-used refresh token is detected, all tokens for that user are revoked (possible token theft).
+      parameters:
+      - description: Refresh token from login response
+        in: header
+        name: X-Refresh-Token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: New token pair generated successfully
+          schema:
+            $ref: '#/definitions/api_v1_auth.RefreshResponse'
+        "400":
+          description: Missing refresh token header
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+        "401":
+          description: Invalid, expired, or already-used refresh token
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+      summary: Refresh access token
+      tags:
+      - Authentication
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account with email, username, and password. Passwords
+        must be at least 8 characters and should include uppercase, lowercase, numbers,
+        and special characters. Email and username must be unique.
+      parameters:
+      - description: User registration information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api_v1_auth.RegisterInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully created user account
+          schema:
+            $ref: '#/definitions/doit_internal_model.User'
+        "400":
+          description: Invalid input, duplicate email, or duplicate username
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api_v1_auth.ErrorResponse'
+      summary: Register a new user account
+      tags:
+      - Authentication
+swagger: "2.0"

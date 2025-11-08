@@ -16,16 +16,16 @@ func SecurityHeaders() web.MiddleWare {
 			// Restricts sources from which content can be loaded
 			// Prevents XSS and data injection attacks
 			// Attacker injects malicious script into pages viewed by other users. Scripts run in victim’s browser with the page’s privileges (cookies/localStorage/access to DOM).
-			w.Header().Set("Content-Security-Policy",
-				"default-src 'self'; "+
-					"script-src 'self'; "+
-					"style-src 'self' 'unsafe-inline'; "+
-					"img-src 'self' data: https:; "+
-					"font-src 'self'; "+
-					"connect-src 'self'; "+
-					"frame-ancestors 'none'; "+
-					"base-uri 'self'; "+
-					"form-action 'self'")
+			// w.Header().Set("Content-Security-Policy",
+			// 	"default-src 'self'; "+
+			// 		"script-src 'self'; "+
+			// 		"style-src 'self' 'unsafe-inline'; "+
+			// 		"img-src 'self' data: https:; "+
+			// 		"font-src 'self'; "+
+			// 		"connect-src 'self'; "+
+			// 		"frame-ancestors 'none'; "+
+			// 		"base-uri 'self'; "+
+			// 		"form-action 'self'")
 
 			// Prevent clickjacking attacks
 			// DENY: page cannot be displayed in a frame, regardless of origin

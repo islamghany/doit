@@ -44,9 +44,16 @@ func (wa *WebApp) handle(method, path string, handler Handler) {
 	pattern := wa.parsePathForMux(method, path)
 	wa.ServeMux.HandleFunc(pattern, h)
 }
+
 func (wa *WebApp) parsePathForMux(method, path string) string {
 	// convert /api/v1/users/:id to  /api/v1/users/{id}
 	// convert /api/v1/users/:id/:name to  /api/v1/users/{id}/{name}
+
+	// convert /api/v1/users/* to  /api/v1/users/{rest...}
+	// replace * with {rest...}
+	if strings.Contains(path, "*") {
+		path = strings.Replace(path, "*", "{rest...}", -1)
+	}
 
 	segments := strings.Split(path, "/")
 	p := ""

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"doit/api/v1/auth"
+	_ "doit/docs" // Import generated swagger docs
 	"doit/internal/cache"
 	"doit/internal/config"
 	"doit/internal/limiter"
@@ -15,6 +16,8 @@ import (
 	"doit/internal/web"
 	"doit/pkg/database"
 	"doit/pkg/logger"
+
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool, cache cache.Cache) (http.Handler, error) {
@@ -47,6 +50,20 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool,
 
 	// Routes
 	auth.RegisterRoutes(app, authHandler, rateLimiter)
+
+	// Swagger documentation endpoint
+	// Access at: http://localhost:8080/swagger/index.html
+	swaggerHandler := httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"), // The url pointing to API definition
+		httpSwagger.DeepLinking(true),
+		httpSwagger.DocExpansion("list"),
+		httpSwagger.DomID("swagger-ui"),
+	)
+	app.Handle("GET", "/swagger/*", func(w http.ResponseWriter, r *http.Request) error {
+		swaggerHandler.ServeHTTP(w, r)
+		return nil
+	})
+
 	app.Handle("GET", "/public", func(w http.ResponseWriter, r *http.Request) error {
 		return web.RespondOK(w, r, map[string]string{"status": "ok", "message": "Hello, World!"})
 	})
