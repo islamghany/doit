@@ -19,18 +19,40 @@ const (
 )
 
 // User represents the domain model for a user
+// @Description User account information (password field is never included in responses)
 type User struct {
-	ID            uuid.UUID              `json:"id"`
-	Email         string                 `json:"email"`
-	Username      string                 `json:"username"`
-	Role          UserRole               `json:"role"`
-	EmailVerified bool                   `json:"email_verified"`
-	IsActive      bool                   `json:"is_active"`
-	Metadata      map[string]interface{} `json:"metadata,omitempty"`
-	LastLoginAt   *time.Time             `json:"last_login_at,omitempty"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at"`
-	TokenVersion  int32                  `json:"token_version,omitempty"`
+	// Unique user identifier (UUID v4)
+	ID uuid.UUID `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+
+	// User's email address
+	Email string `json:"email" example:"john.doe@example.com"`
+
+	// User's unique username
+	Username string `json:"username" example:"johndoe"`
+
+	// User's role (user, admin, moderator)
+	Role UserRole `json:"role" example:"user" enums:"user,admin,moderator"`
+
+	// Whether the user's email has been verified
+	EmailVerified bool `json:"email_verified" example:"false"`
+
+	// Whether the user account is active
+	IsActive bool `json:"is_active" example:"true"`
+
+	// Additional metadata (flexible key-value storage)
+	Metadata map[string]interface{} `json:"metadata,omitempty" swaggertype:"object"`
+
+	// Last successful login timestamp
+	LastLoginAt *time.Time `json:"last_login_at,omitempty" example:"2025-11-08T10:30:00Z"`
+
+	// Account creation timestamp
+	CreatedAt time.Time `json:"created_at" example:"2025-11-08T10:00:00Z"`
+
+	// Last update timestamp
+	UpdatedAt time.Time `json:"updated_at" example:"2025-11-08T10:00:00Z"`
+
+	// Token version for refresh token rotation (used internally for security)
+	TokenVersion int32 `json:"token_version,omitempty" example:"1"`
 }
 
 func (u *User) IsUserActive() bool {

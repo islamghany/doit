@@ -25,6 +25,17 @@ func NewHandler(log *logger.Logger, userService *service.UserService, tokenServi
 	return &Handler{log: log, userService: userService, tokenService: tokenService, config: config}
 }
 
+// Register godoc
+// @Summary      Register a new user account
+// @Description  Create a new user account with email, username, and password. Passwords must be at least 8 characters and should include uppercase, lowercase, numbers, and special characters. Email and username must be unique.
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Param        request body RegisterInput true "User registration information"
+// @Success      200 {object} model.User "Successfully created user account"
+// @Failure      400 {object} ErrorResponse "Invalid input, duplicate email, or duplicate username"
+// @Failure      500 {object} ErrorResponse "Internal server error"
+// @Router       /auth/register [post]
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
@@ -56,6 +67,20 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) error {
 	return web.RespondOK(w, r, user)
 }
 
+// Login godoc
+// @Summary      Authenticate and login user
+// @Description  Authenticate user credentials and receive JWT access token and refresh token. The access token is short-lived (15 minutes) and used for API requests. The refresh token is long-lived (7 days) and used to obtain new access tokens.
+// @Description  Rate limit: 5 requests per minute per IP address
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Param        credentials body LoginInput true "User login credentials"
+// @Success      200 {object} LoginResponse "Login successful with user info and tokens"
+// @Failure      400 {object} ErrorResponse "Invalid request body"
+// @Failure      401 {object} ErrorResponse "Invalid credentials (wrong email or password)"
+// @Failure      429 {object} ErrorResponse "Rate limit exceeded"
+// @Failure      500 {object} ErrorResponse "Internal server error"
+// @Router       /auth/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
@@ -90,7 +115,19 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) error {
 	return web.RespondOK(w, r, response)
 }
 
-// Refresh exchanges a refresh token for a new access token
+// Refresh godoc
+// @Summary      Refresh access token
+// @Description  Exchange a valid refresh token for a new access token and refresh token pair. This implements refresh token rotation for enhanced security - the old refresh token becomes invalid after use.
+// @Description  Security: If an already-used refresh token is detected, all tokens for that user are revoked (possible token theft).
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Param        X-Refresh-Token header string true "Refresh token from login response"
+// @Success      200 {object} RefreshResponse "New token pair generated successfully"
+// @Failure      400 {object} ErrorResponse "Missing refresh token header"
+// @Failure      401 {object} ErrorResponse "Invalid, expired, or already-used refresh token"
+// @Failure      500 {object} ErrorResponse "Internal server error"
+// @Router       /auth/refresh [post]
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
@@ -124,7 +161,17 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) error {
 	return web.RespondOK(w, r, response)
 }
 
-// Logout revokes the current refresh token
+// Logout godoc
+// @Summary      Logout user (single device)
+// @Description  Revoke the current refresh token, logging out the user from this specific device/session. Other active sessions remain valid.
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Param        X-Refresh-Token header string true "Refresh token to revoke"
+// @Success      200 {object} MessageResponse "Logged out successfully"
+// @Failure      400 {object} ErrorResponse "Missing refresh token header"
+// @Failure      500 {object} ErrorResponse "Internal server error"
+// @Router       /auth/logout [post]
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
@@ -142,7 +189,17 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) error {
 	return web.RespondOK(w, r, nil)
 }
 
-// LogoutAll revokes all tokens for the current user
+// LogoutAll godoc
+// @Summary      Logout user from all devices
+// @Description  Revoke all refresh tokens for the authenticated user, logging them out from all devices and sessions. Use this when account security is compromised.
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Security     bearer
+// @Success      200 {object} MessageResponse "Logged out from all devices successfully"
+// @Failure      401 {object} ErrorResponse "Unauthorized - missing or invalid access token"
+// @Failure      500 {object} ErrorResponse "Internal server error"
+// @Router       /auth/logout/all [post]
 func (h *Handler) LogoutAll(w http.ResponseWriter, r *http.Request) error {
 	// userID := web.GetUserID(r)
 	// 2. Revoke all user tokens

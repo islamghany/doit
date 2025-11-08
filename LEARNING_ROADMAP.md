@@ -47,7 +47,7 @@
 - [x] Add password strength validation
 - [x] Ensure OWASP Top 10 security best practices are implemented
 - [x] Add CORS middleware and security headers
-- [ ] Implement rate limiting on auth endpoints (prevent brute force)
+- [x] Implement rate limiting on auth endpoints (prevent brute force)
 
 **Why this first:** Almost every real application needs authentication. It touches all layers (API → Service → Database) and teaches security fundamentals.
 
@@ -70,14 +70,14 @@
 
 **Implementation Tasks:**
 
-- [ ] Choose approach: `swaggo/swag` (code-first) or `oapi-codegen` (spec-first)
-- [ ] Add Swagger annotations to all endpoints
-- [ ] Generate OpenAPI spec
-- [ ] Set up Swagger UI endpoint (`/swagger`)
-- [ ] Document request/response schemas
-- [ ] Add authentication documentation
-- [ ] Document error responses
-- [ ] Version your API (v1, v2 strategy)
+- [x] Choose approach: `swaggo/swag` (code-first) or `oapi-codegen` (spec-first) ✅ **Chose swaggo/swag**
+- [x] Add Swagger annotations to all endpoints ✅ **Auth endpoints fully documented**
+- [x] Generate OpenAPI spec ✅ **Generated docs/swagger.json and swagger.yaml**
+- [x] Set up Swagger UI endpoint (`/swagger`) ✅ **Available at /swagger/index.html**
+- [x] Document request/response schemas ✅ **Created swagger_models.go**
+- [x] Add authentication documentation ✅ **JWT Bearer authentication documented**
+- [x] Document error responses ✅ **StandardErrorResponse model created**
+- [x] Version your API (v1, v2 strategy) ✅ **Using /v1 prefix, ready for v2**
 
 **Deliverable:** Beautiful, interactive API documentation at `/swagger`
 

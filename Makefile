@@ -39,6 +39,8 @@ help:
 	@echo "📦 Code Generation:"
 	@echo "  sqlc           - Generate sqlc code"
 	@echo "  generate-mocks - Generate mock files for testing"
+	@echo "  swagger        - Generate Swagger documentation"
+	@echo "  swagger-fmt    - Format Swagger comments"
 	@echo ""
 	@echo "🔍 Code Quality:"
 	@echo "  lint           - Run golangci-lint"
@@ -88,6 +90,27 @@ install-mockgen:
 # Generate mocks for testing
 generate-mocks:
 	@./scripts/generate-mocks.sh
+
+# Generate Swagger documentation
+swagger:
+	@echo "📚 Generating Swagger documentation..."
+	@command -v swag >/dev/null 2>&1 || (echo "❌ swag not found. Run 'make install-swag' first." && exit 1)
+	swag init -g cmd/doit/main.go -o docs --parseDependency --parseInternal
+	@echo "✅ Swagger docs generated successfully!"
+	@echo "📖 View at: http://localhost:8080/swagger/index.html (after running the app)"
+
+# Format Swagger comments
+swagger-fmt:
+	@echo "🎨 Formatting Swagger comments..."
+	@command -v swag >/dev/null 2>&1 || (echo "❌ swag not found. Run 'make install-swag' first." && exit 1)
+	swag fmt
+	@echo "✅ Swagger comments formatted!"
+
+# Install swag CLI tool
+install-swag:
+	@echo "📥 Installing swag..."
+	go install github.com/swaggo/swag/cmd/swag@latest
+	@echo "✅ swag installed successfully!"
 
 # Database migrations
 migrate-up:
