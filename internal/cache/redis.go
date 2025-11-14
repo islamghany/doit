@@ -278,3 +278,8 @@ func (c *RedisCache) Clear(ctx context.Context) error {
 func (c *RedisCache) Close() error {
 	return c.client.Close()
 }
+
+// Ping checks if the Redis connection is alive
+func (c *RedisCache) Ping(ctx context.Context) error {
+	return c.client.Ping(ctx).Err()
+}

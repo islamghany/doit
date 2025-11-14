@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"doit/api/v1/auth"
+	healthcheck "doit/api/v1/health_check"
 	_ "doit/docs" // Import generated swagger docs
 	"doit/internal/cache"
 	"doit/internal/config"
@@ -47,9 +48,11 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool,
 
 	// Handlers
 	authHandler := auth.NewHandler(logger, userService, tokenService, cfg)
+	healthcheckHandler := healthcheck.NewHandler(logger, dbPool, cache, cfg.App.Version)
 
 	// Routes
 	auth.RegisterRoutes(app, authHandler, rateLimiter)
+	healthcheck.RegisterRoutes(app, healthcheckHandler)
 
 	// Swagger documentation endpoint
 	// Access at: http://localhost:8080/swagger/index.html

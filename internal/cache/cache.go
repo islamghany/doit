@@ -36,6 +36,9 @@ type Cache interface {
 	// Utility Operations
 	Clear(ctx context.Context) error
 	Close() error
+
+	// Health Check
+	Ping(ctx context.Context) error
 }
 
 // validateKey checks if the key is valid

@@ -51,6 +51,7 @@ type ServerConfig struct {
 type AppConfig struct {
 	Environment Environment `env:"ENVIRONMENT" flag:"environment" default:"development"`
 	LogLevel    string      `env:"LOG_LEVEL" flag:"log_level" default:"info"`
+	Version     string      `env:"VERSION" flag:"version" default:"v1.0.0"`
 }
 
 type SecurityConfig struct {

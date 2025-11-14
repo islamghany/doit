@@ -102,6 +102,82 @@ definitions:
     - role
     - username
     type: object
+  api_v1_health_check.CheckResult:
+    properties:
+      latency:
+        description: Latency indicates how long the check took to complete
+        example: 15ms
+        type: string
+      message:
+        description: Message provides additional context when a check fails
+        example: 'database unavailable: connection timeout'
+        type: string
+      status:
+        description: Status indicates if the check passed ("ok") or failed ("failed")
+        enum:
+        - ok
+        - failed
+        example: ok
+        type: string
+    type: object
+  api_v1_health_check.HealthResponse:
+    properties:
+      stats:
+        allOf:
+        - $ref: '#/definitions/api_v1_health_check.RuntimeStats'
+        description: Stats contains optional runtime statistics
+      status:
+        description: Status indicates if the application is alive (always "ok" if
+          responding)
+        example: ok
+        type: string
+      timestamp:
+        description: Timestamp of the health check in RFC3339 format
+        example: "2025-11-14T10:30:00Z"
+        type: string
+      uptime:
+        description: Uptime duration since application started
+        example: 2h15m30s
+        type: string
+      version:
+        description: Version of the application
+        example: v1.0.0
+        type: string
+    type: object
+  api_v1_health_check.ReadinessResponse:
+    properties:
+      checks:
+        additionalProperties:
+          $ref: '#/definitions/api_v1_health_check.CheckResult'
+        description: Checks contains the status of each dependency check
+        type: object
+      status:
+        description: Status indicates overall readiness ("ready" or "not_ready")
+        enum:
+        - ready
+        - not_ready
+        example: ready
+        type: string
+      timestamp:
+        description: Timestamp of the readiness check in RFC3339 format
+        example: "2025-11-14T10:30:00Z"
+        type: string
+    type: object
+  api_v1_health_check.RuntimeStats:
+    properties:
+      goroutines:
+        description: Goroutines is the number of active goroutines
+        example: 42
+        type: integer
+      heap_objects:
+        description: HeapObjects is the number of allocated heap objects
+        example: 250000
+        type: integer
+      memory_alloc_mb:
+        description: MemoryAlloc is the allocated memory in megabytes
+        example: 128
+        type: integer
+    type: object
   doit_internal_model.TokenPair:
     properties:
       access_token:
@@ -351,4 +427,60 @@ paths:
       summary: Register a new user account
       tags:
       - Authentication
+  /health:
+    get:
+      description: |-
+        Lightweight endpoint that verifies the application process is alive and responsive. This endpoint does NOT check dependencies like database or Redis. Used by Kubernetes/container orchestrators as a liveness probe - if this fails repeatedly, the container will be restarted.
+
+        **What it checks:**
+        - Web server is responsive
+        - Application hasn't crashed or deadlocked
+
+        **What it does NOT check:**
+        - Database connectivity
+        - Redis/cache availability
+        - External service availability
+
+        **Response time target:** < 10ms
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Application is alive and responsive
+          schema:
+            $ref: '#/definitions/api_v1_health_check.HealthResponse'
+      summary: Health check endpoint (Liveness Probe)
+      tags:
+      - Health
+  /ready:
+    get:
+      description: |-
+        Comprehensive health check that verifies all application dependencies are available and the application is ready to serve traffic. Used by Kubernetes/container orchestrators as a readiness probe - if this fails, the pod is removed from load balancer but NOT restarted.
+
+        **What it checks:**
+        - Database connectivity and responsiveness (PostgreSQL)
+        - Redis/cache availability
+        - Disk space availability
+
+        **Behavior:**
+        - Returns 200 OK when all checks pass
+        - Returns 503 Service Unavailable when any check fails
+        - Pod stays running but stops receiving traffic until checks pass again
+
+        **Response time target:** < 500ms
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Application is ready to receive traffic - all dependencies
+            are healthy
+          schema:
+            $ref: '#/definitions/api_v1_health_check.ReadinessResponse'
+        "503":
+          description: Application is not ready - one or more dependencies are unavailable
+          schema:
+            $ref: '#/definitions/api_v1_health_check.ReadinessResponse'
+      summary: Readiness check endpoint (Readiness Probe)
+      tags:
+      - Health
 swagger: "2.0"

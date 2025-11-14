@@ -252,6 +252,52 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/health": {
+            "get": {
+                "description": "Lightweight endpoint that verifies the application process is alive and responsive. This endpoint does NOT check dependencies like database or Redis. Used by Kubernetes/container orchestrators as a liveness probe - if this fails repeatedly, the container will be restarted.\n\n**What it checks:**\n- Web server is responsive\n- Application hasn't crashed or deadlocked\n\n**What it does NOT check:**\n- Database connectivity\n- Redis/cache availability\n- External service availability\n\n**Response time target:** \u003c 10ms",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Health check endpoint (Liveness Probe)",
+                "responses": {
+                    "200": {
+                        "description": "Application is alive and responsive",
+                        "schema": {
+                            "$ref": "#/definitions/api_v1_health_check.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ready": {
+            "get": {
+                "description": "Comprehensive health check that verifies all application dependencies are available and the application is ready to serve traffic. Used by Kubernetes/container orchestrators as a readiness probe - if this fails, the pod is removed from load balancer but NOT restarted.\n\n**What it checks:**\n- Database connectivity and responsiveness (PostgreSQL)\n- Redis/cache availability\n- Disk space availability\n\n**Behavior:**\n- Returns 200 OK when all checks pass\n- Returns 503 Service Unavailable when any check fails\n- Pod stays running but stops receiving traffic until checks pass again\n\n**Response time target:** \u003c 500ms",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Readiness check endpoint (Readiness Probe)",
+                "responses": {
+                    "200": {
+                        "description": "Application is ready to receive traffic - all dependencies are healthy",
+                        "schema": {
+                            "$ref": "#/definitions/api_v1_health_check.ReadinessResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Application is not ready - one or more dependencies are unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/api_v1_health_check.ReadinessResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -386,6 +432,109 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 50,
                     "example": "janesmith"
+                }
+            }
+        },
+        "api_v1_health_check.CheckResult": {
+            "type": "object",
+            "properties": {
+                "latency": {
+                    "description": "Latency indicates how long the check took to complete",
+                    "type": "string",
+                    "example": "15ms"
+                },
+                "message": {
+                    "description": "Message provides additional context when a check fails",
+                    "type": "string",
+                    "example": "database unavailable: connection timeout"
+                },
+                "status": {
+                    "description": "Status indicates if the check passed (\"ok\") or failed (\"failed\")",
+                    "type": "string",
+                    "enum": [
+                        "ok",
+                        "failed"
+                    ],
+                    "example": "ok"
+                }
+            }
+        },
+        "api_v1_health_check.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "stats": {
+                    "description": "Stats contains optional runtime statistics",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/api_v1_health_check.RuntimeStats"
+                        }
+                    ]
+                },
+                "status": {
+                    "description": "Status indicates if the application is alive (always \"ok\" if responding)",
+                    "type": "string",
+                    "example": "ok"
+                },
+                "timestamp": {
+                    "description": "Timestamp of the health check in RFC3339 format",
+                    "type": "string",
+                    "example": "2025-11-14T10:30:00Z"
+                },
+                "uptime": {
+                    "description": "Uptime duration since application started",
+                    "type": "string",
+                    "example": "2h15m30s"
+                },
+                "version": {
+                    "description": "Version of the application",
+                    "type": "string",
+                    "example": "v1.0.0"
+                }
+            }
+        },
+        "api_v1_health_check.ReadinessResponse": {
+            "type": "object",
+            "properties": {
+                "checks": {
+                    "description": "Checks contains the status of each dependency check",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/api_v1_health_check.CheckResult"
+                    }
+                },
+                "status": {
+                    "description": "Status indicates overall readiness (\"ready\" or \"not_ready\")",
+                    "type": "string",
+                    "enum": [
+                        "ready",
+                        "not_ready"
+                    ],
+                    "example": "ready"
+                },
+                "timestamp": {
+                    "description": "Timestamp of the readiness check in RFC3339 format",
+                    "type": "string",
+                    "example": "2025-11-14T10:30:00Z"
+                }
+            }
+        },
+        "api_v1_health_check.RuntimeStats": {
+            "type": "object",
+            "properties": {
+                "goroutines": {
+                    "description": "Goroutines is the number of active goroutines",
+                    "type": "integer",
+                    "example": 42
+                },
+                "heap_objects": {
+                    "description": "HeapObjects is the number of allocated heap objects",
+                    "type": "integer",
+                    "example": 250000
+                },
+                "memory_alloc_mb": {
+                    "description": "MemoryAlloc is the allocated memory in megabytes",
+                    "type": "integer",
+                    "example": 128
                 }
             }
         },
