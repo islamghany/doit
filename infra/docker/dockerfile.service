@@ -1,0 +1,92 @@
+# syntax=docker/dockerfile:1.4
+#
+# Multi-stage Dockerfile for doit API
+# Optimized for: Size, Security, Build Speed
+#
+
+# Build arguments for version info
+ARG GO_VERSION=1.24
+ARG ALPINE_VERSION=3.19
+
+# ============================================
+# Stage 1: Builder
+# ============================================
+FROM golang:${GO_VERSION}-alpine AS builder
+
+# Install build dependencies (git for go mod, ca-certificates for HTTPS)
+RUN apk add --no-cache git ca-certificates tzdata
+
+# Build metadata
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+
+WORKDIR /build
+
+# Cache dependencies layer
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+# Copy source code
+COPY . .
+
+# Build with optimizations
+RUN CGO_ENABLED=0 \
+    GOOS=linux \
+    GOARCH=amd64 \
+    go build \
+    -ldflags="-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildDate=${BUILD_DATE}" \
+    -trimpath \
+    -o app \
+    ./cmd/doit/main.go
+
+
+# ============================================
+# Stage 2: Runtime
+# ============================================
+FROM alpine:${ALPINE_VERSION}
+
+# Re-declare ARGs for this stage (ARGs don't persist across stages)
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+
+# OCI standard labels
+LABEL org.opencontainers.image.title="doit-api"
+LABEL org.opencontainers.image.description="Production-ready Go REST API"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${COMMIT}"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL maintainer="islamghany3@gmail.com"
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata
+
+# Create non-root user
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
+
+# Create app directory
+WORKDIR /app
+
+# Copy binary with correct ownership
+COPY --from=builder --chown=appuser:appuser /build/app ./app
+
+# Copy timezone data (if your app needs it)
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+
+# Switch to non-root user
+USER appuser
+
+
+# Health check (optional but recommended)
+# HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+#     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+
+# Expose port
+EXPOSE 8080
+
+# Run the binary
+ENTRYPOINT ["./app"]

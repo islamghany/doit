@@ -3,6 +3,13 @@ include .env
 .PHONY: help build run test clean migrate-up migrate-down sqlc docker-up docker-down
 
 DB_URL := postgresql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
+# Docker variables
+IMAGE_NAME := doit-api
+IMAGE_TAG := $(shell git describe --tags --always --dirty)
+COMMIT := $(shell git rev-parse HEAD)
+BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+VERSION := $(shell git describe --tags --always)
+
 # Default target
 help:
 	@echo "Available targets:"
@@ -49,6 +56,13 @@ help:
 	@echo "  vuln-check     - Check for vulnerabilities (govulncheck)"
 	@echo ""
 	@echo "🐳 Docker:"
+	@echo "  docker-build   - Build Docker image"
+	@echo "  docker-build-no-cache - Build Docker image without cache"
+	@echo "  docker-run     - Run Docker container locally"
+	@echo "  docker-inspect - Inspect Docker image labels and metadata"
+	@echo "  docker-size    - Show Docker image size"
+	@echo "  docker-shell   - Get shell access to container (if using alpine)"
+	@echo "  docker-clean   - Remove Docker images"
 	@echo "  docker-up      - Start Docker containers"
 	@echo "  docker-down    - Stop Docker containers"
 	@echo "  dev-db         - Start development database container"
@@ -192,6 +206,52 @@ migrate-status:
 	@ls -1 internal/data/migrations/*.up.sql | sed 's/.*\//  - /'
 
 # Docker commands
+
+## Build Docker image with metadata
+docker-build: 
+	docker build \
+		-f infra/docker/dockerfile.service \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t $(IMAGE_NAME):$(IMAGE_TAG) \
+		-t $(IMAGE_NAME):latest \
+		.
+
+docker-build-no-cache: ## Build Docker image without cache
+	docker build --no-cache \
+		-f infra/docker/dockerfile.service \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t $(IMAGE_NAME):$(IMAGE_TAG) \
+		-t $(IMAGE_NAME):latest \
+		.
+
+docker-run: ## Run Docker container locally
+	docker run --rm -it \
+		-p 8080:8080 \
+		-e DB_HOST=host.docker.internal \
+		-e DB_PORT=5432 \
+		-e DB_USER=postgres \
+		-e DB_PASSWORD=postgres \
+		-e DB_NAME=doit \
+		-e REDIS_ADDR=host.docker.internal:6379 \
+		$(IMAGE_NAME):latest
+
+
+docker-inspect: ## Inspect Docker image labels and metadata
+	@docker inspect $(IMAGE_NAME):latest | jq '.[0].Config.Labels'
+
+docker-size: ## Show Docker image size
+	@docker images $(IMAGE_NAME):latest --format "Size: {{.Size}}"
+
+docker-shell: ## Get shell access to container (if using alpine)
+	docker run --rm -it --entrypoint /bin/sh $(IMAGE_NAME):latest
+
+docker-clean: ## Remove Docker images
+	docker rmi $(IMAGE_NAME):latest $(IMAGE_NAME):$(IMAGE_TAG) || true
+
 docker-up:
 	docker-compose -f infra/docker/docker-compose.yml up -d
 

@@ -52,11 +52,13 @@ import (
 	"doit/pkg/logger"
 )
 
-// // this vars are set by the compiler via ldflags. e.g. go build -ldflags "-X main.build=production -X main.version=v1.0.0"
-// var (
-// 	build   = "development"
-// 	version = "v0.0.1"
-// )
+// Build information set via ldflags during compilation
+// Example: go build -ldflags "-X main.Version=v1.0.0 -X main.Commit=abc123 -X main.BuildDate=2024-01-01"
+var (
+	Version   = "dev"     // Git tag or version
+	Commit    = "unknown" // Git commit SHA
+	BuildDate = "unknown" // Build timestamp
+)
 
 func main() {
 	// Create a context for the application.
@@ -73,6 +75,13 @@ func main() {
 
 	// Setup logger
 	log := setupLogger(cfg)
+
+	// Log build information
+	log.Info(ctx, "Build Information",
+		"version", Version,
+		"commit", Commit,
+		"buildDate", BuildDate,
+	)
 
 	// Start application
 	log.Info(ctx, "Starting application",

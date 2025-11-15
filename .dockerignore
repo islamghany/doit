@@ -1,0 +1,74 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.circleci
+
+# Documentation
+*.md
+API_DOCUMENTATION_GUIDE.md
+INTEGRATION_EXAMPLE.md
+MODEL_PATTERN.md
+OWASP_TOP_10_GUIDE.md
+QUICK_REFERENCE.md
+REAL_WORLD_EXAMPLES.md
+SECURITY_IMPLEMENTATION_GUIDE.md
+SECURITY_SUMMARY.md
+
+# Tests
+*_test.go
+testdata/
+coverage.out
+coverage.html
+
+# Build artifacts
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Kubernetes
+infra/k8s/
+infra/docker/
+
+# Scripts (usually not needed in container)
+scripts/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Go specific
+vendor/  # If you use go mod (which you do)
