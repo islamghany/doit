@@ -1,0 +1,241 @@
+services:
+  # ============================================
+  # Database Migrations (Run First)
+  # ============================================
+  migrations:
+    image: migrate/migrate:latest
+    container_name: doit-migrations
+    depends_on:
+      postgres:
+        condition: service_healthy # 🔑 Wait for DB to be ready
+    volumes:
+      - ./internal/data/migrations:/migrations
+    command: 
+      - "-path=/migrations"
+      - "-database=postgresql://${DB_USER:-doit}:${DB_PASSWORD:-doit123}@postgres:5432/${DB_NAME:-doit}?sslmode=disable"
+      - "up"
+    networks:
+      - doit_network
+    restart: on-failure
+
+  # ============================================
+  # Your Go API
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/dockerfile.service
+    container_name: doit-api
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy # 🔑 Waits for DB to be ready
+      redis:
+        condition: service_healthy # 🔑 Waits for cache to be ready
+      migrations:
+        condition: service_completed_successfully # 🔑 Wait for migrations to finish!
+    environment:
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-doit}
+      DB_PASSWORD: ${DB_PASSWORD:-doit123}
+      DB_NAME: ${DB_NAME:-doit}
+      DB_DISABLE_TLS: true
+      DB_SSL_MODE: disable
+
+      # Redis
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # Application
+      APP_NAME: doit-api
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-development}
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+
+      # JWT  
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-change-in-production}
+      JWT_ACCESS_TOKEN_EXP: ${JWT_ACCESS_TOKEN_EXP:-900}
+      JWT_REFRESH_TOKEN_EXP: ${JWT_REFRESH_TOKEN_EXP:-604800}
+
+      # Server
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      SERVER_READ_TIMEOUT: 10
+      SERVER_WRITE_TIMEOUT: 10
+      SERVER_SHUTDOWN_TIMEOUT: 30
+    # volumes:
+    #   - ./:/app # Mount source code for development (hot reload) - DISABLED: overwrites binary
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s # 🔑 Gives app time to start
+    networks:
+      - doit_network
+    restart: unless-stopped
+
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: doit-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME:-doit}
+      POSTGRES_USER: ${DB_USER:-doit}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-doit123}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Uncomment to run init scripts on first start
+      # - ./internal/data/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-doit} -d ${DB_NAME:-doit}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - doit_network
+    restart: unless-stopped
+
+  # ============================================
+  # Redis Cache
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: doit-redis
+    ports:
+      - "6379:6379"
+    command: >
+      sh -c "
+      if [ -z \"$$REDIS_PASSWORD\" ]; then
+        redis-server --appendonly yes
+      else
+        redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\"
+      fi
+      "
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - doit_network
+    restart: unless-stopped
+
+  # ============================================
+  # Prometheus (Metrics Collection)
+  # ============================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: doit-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/docker/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+      - "--storage.tsdb.retention.time=30d"
+    networks:
+      - doit_network
+    restart: unless-stopped
+
+  # ============================================
+  # Grafana (Metrics Visualization)
+  # ============================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: doit-grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    environment:
+      # Admin credentials
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      
+      # Security
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      
+      # Anonymous access (disable in production)
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      
+      # Server
+      GF_SERVER_ROOT_URL: http://localhost:3000
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/docker/grafana/provisioning:/etc/grafana/provisioning
+      - ./infra/docker/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - doit_network
+    restart: unless-stopped
+
+  # ============================================
+  # Adminer (Database Management UI)
+  # ============================================
+  adminer:
+    image: adminer:latest
+    container_name: doit-adminer
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: dracula
+    networks:
+      - doit_network
+    restart: unless-stopped
+    profiles:
+      - tools # Only start with --profile tools
+
+# ============================================
+# Volumes (Persistent Data)
+# ============================================
+volumes:
+  postgres_data:
+    name: doit_postgres_data
+    driver: local
+  
+  redis_data:
+    name: doit_redis_data
+    driver: local
+  
+  prometheus_data:
+    name: doit_prometheus_data
+    driver: local
+  
+  grafana_data:
+    name: doit_grafana_data
+    driver: local
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  doit_network:
+    name: doit_network
+    driver: bridge
+

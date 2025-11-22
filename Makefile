@@ -55,7 +55,7 @@ help:
 	@echo "  security       - Run security checks (gosec)"
 	@echo "  vuln-check     - Check for vulnerabilities (govulncheck)"
 	@echo ""
-	@echo "🐳 Docker:"
+	@echo "🐳 Docker (Single Container):"
 	@echo "  docker-build   - Build Docker image"
 	@echo "  docker-build-no-cache - Build Docker image without cache"
 	@echo "  docker-run     - Run Docker container locally"
@@ -63,8 +63,25 @@ help:
 	@echo "  docker-size    - Show Docker image size"
 	@echo "  docker-shell   - Get shell access to container (if using alpine)"
 	@echo "  docker-clean   - Remove Docker images"
-	@echo "  docker-up      - Start Docker containers"
-	@echo "  docker-down    - Stop Docker containers"
+	@echo ""
+	@echo "🐙 Docker Compose (Full Stack):"
+	@echo "  compose-up     - Start all services (API, DB, Redis, Prometheus, Grafana)"
+	@echo "  compose-up-build - Build and start all services"
+	@echo "  compose-down   - Stop all services"
+	@echo "  compose-down-v - Stop all services and remove volumes (⚠️  deletes data!)"
+	@echo "  compose-logs   - View logs from all services"
+	@echo "  compose-logs-api - View logs from API only"
+	@echo "  compose-ps     - Show running services"
+	@echo "  compose-restart - Restart all services"
+	@echo "  compose-restart-api - Restart API only"
+	@echo "  compose-shell-api - Get shell in API container"
+	@echo "  compose-shell-db - Get shell in PostgreSQL container"
+	@echo "  compose-migrate-up - Run migrations in docker-compose environment"
+	@echo "  compose-migrate-down - Rollback migrations in docker-compose environment"
+	@echo "  compose-setup  - Setup .env file for docker-compose"
+	@echo "  compose-health - Check health of all services"
+	@echo ""
+	@echo "🛠️  Development Database:"
 	@echo "  dev-db         - Start development database container"
 	@echo "  dev-db-stop    - Stop development database container"
 
@@ -233,9 +250,10 @@ docker-run: ## Run Docker container locally
 		-p 8080:8080 \
 		-e DB_HOST=host.docker.internal \
 		-e DB_PORT=5432 \
-		-e DB_USER=postgres \
-		-e DB_PASSWORD=postgres \
+		-e DB_USER=islamghany \
+		-e DB_PASSWORD=secret \
 		-e DB_NAME=doit \
+		-e DB_SSL_MODE=disable \
 		-e REDIS_ADDR=host.docker.internal:6379 \
 		$(IMAGE_NAME):latest
 
@@ -252,11 +270,178 @@ docker-shell: ## Get shell access to container (if using alpine)
 docker-clean: ## Remove Docker images
 	docker rmi $(IMAGE_NAME):latest $(IMAGE_NAME):$(IMAGE_TAG) || true
 
-docker-up:
-	docker-compose -f infra/docker/docker-compose.yml up -d
+# ============================================
+# Docker Compose Commands
+# ============================================
 
-docker-down:
-	docker-compose -f infra/docker/docker-compose.yml down
+## Start all services in detached mode
+compose-up:
+	@echo "🚀 Starting all services..."
+	docker-compose up -d
+	@echo ""
+	@echo "✅ All services started!"
+	@echo ""
+	@echo "📋 Service URLs:"
+	@echo "  🔹 API:         http://localhost:8080"
+	@echo "  🔹 Swagger:     http://localhost:8080/swagger/index.html"
+	@echo "  🔹 Health:      http://localhost:8080/health"
+	@echo "  🔹 Metrics:     http://localhost:8080/metrics"
+	@echo "  🔹 Grafana:     http://localhost:3000 (admin/admin)"
+	@echo "  🔹 Prometheus:  http://localhost:9090"
+	@echo "  🔹 Adminer:     http://localhost:8081 (use --profile tools)"
+	@echo ""
+	@echo "📊 Check status: make compose-ps"
+	@echo "📜 View logs:    make compose-logs"
+
+## Build and start all services
+compose-up-build:
+	@echo "🔨 Building and starting all services..."
+	docker-compose up -d --build
+	@echo "✅ All services built and started!"
+
+## Start services with logs visible (foreground)
+compose-up-logs:
+	@echo "🚀 Starting all services with logs..."
+	docker-compose up
+
+## Stop all services
+compose-down:
+	@echo "🛑 Stopping all services..."
+	docker-compose down
+	@echo "✅ All services stopped!"
+
+## Stop all services and remove volumes (⚠️  deletes data!)
+compose-down-v:
+	@echo "⚠️  WARNING: This will delete all data (volumes)!"
+	@read -p "Continue? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		docker-compose down -v; \
+		echo "✅ All services stopped and volumes removed!"; \
+	fi
+
+## View logs from all services
+compose-logs:
+	docker-compose logs -f
+
+## View logs from API only
+compose-logs-api:
+	docker-compose logs -f api
+
+## View logs from PostgreSQL
+compose-logs-db:
+	docker-compose logs -f postgres
+
+## View logs from Redis
+compose-logs-redis:
+	docker-compose logs -f redis
+
+## View logs from Prometheus
+compose-logs-prometheus:
+	docker-compose logs -f prometheus
+
+## View logs from Grafana
+compose-logs-grafana:
+	docker-compose logs -f grafana
+
+## Show running services
+compose-ps:
+	@echo "📊 Running Services:"
+	@docker-compose ps
+	@echo ""
+	@echo "💡 Tip: Use 'make compose-health' to check health status"
+
+## Restart all services
+compose-restart:
+	@echo "🔄 Restarting all services..."
+	docker-compose restart
+	@echo "✅ All services restarted!"
+
+## Restart API only
+compose-restart-api:
+	@echo "🔄 Restarting API..."
+	docker-compose restart api
+	@echo "✅ API restarted!"
+
+## Restart PostgreSQL
+compose-restart-db:
+	docker-compose restart postgres
+
+## Restart Redis
+compose-restart-redis:
+	docker-compose restart redis
+
+## Get shell in API container
+compose-shell-api:
+	docker-compose exec api /bin/sh
+
+## Get shell in PostgreSQL container
+compose-shell-db:
+	docker-compose exec postgres psql -U $(DB_USER) -d $(DB_NAME)
+
+## Get shell in Redis container
+compose-shell-redis:
+	docker-compose exec redis redis-cli
+
+## Run migrations in docker-compose environment
+compose-migrate-up:
+	@echo "📦 Running migrations..."
+	docker-compose exec api migrate -path /app/internal/data/migrations -database "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres:5432/$(DB_NAME)?sslmode=disable" up
+	@echo "✅ Migrations complete!"
+
+## Rollback migrations in docker-compose environment
+compose-migrate-down:
+	@echo "📦 Rolling back migrations..."
+	docker-compose exec api migrate -path /app/internal/data/migrations -database "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres:5432/$(DB_NAME)?sslmode=disable" down 1
+	@echo "✅ Rollback complete!"
+
+## Setup .env file for docker-compose
+compose-setup:
+	@if [ ! -f .env ]; then \
+		echo "📝 Creating .env file from .env.example..."; \
+		cp .env.example .env; \
+		echo "✅ .env file created!"; \
+		echo "⚠️  Please update .env with your actual configuration"; \
+	else \
+		echo "ℹ️  .env file already exists"; \
+	fi
+
+## Check health of all services
+compose-health:
+	@echo "🏥 Checking service health..."
+	@echo ""
+	@echo "📊 API Health:"
+	@curl -s http://localhost:8080/health | jq . || echo "❌ API not responding"
+	@echo ""
+	@echo "📊 PostgreSQL Health:"
+	@docker-compose exec -T postgres pg_isready -U $(DB_USER) -d $(DB_NAME) || echo "❌ PostgreSQL not ready"
+	@echo ""
+	@echo "📊 Redis Health:"
+	@docker-compose exec -T redis redis-cli ping || echo "❌ Redis not responding"
+	@echo ""
+	@echo "📊 Prometheus Health:"
+	@curl -s http://localhost:9090/-/healthy || echo "❌ Prometheus not responding"
+	@echo ""
+	@echo "📊 Grafana Health:"
+	@curl -s http://localhost:3000/api/health | jq . || echo "❌ Grafana not responding"
+
+## Pull latest images
+compose-pull:
+	@echo "📥 Pulling latest images..."
+	docker-compose pull
+	@echo "✅ Images updated!"
+
+## Show resource usage
+compose-stats:
+	@echo "📊 Resource Usage:"
+	docker stats --no-stream $$(docker-compose ps -q)
+
+## Start with tools profile (includes Adminer)
+compose-up-tools:
+	@echo "🚀 Starting all services with tools..."
+	docker-compose --profile tools up -d
+	@echo "✅ All services started (including tools)!"
+	@echo "  🔹 Adminer: http://localhost:8081"
 
 # Development database setup
 dev-db:

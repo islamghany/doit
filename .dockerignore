@@ -57,6 +57,8 @@ docker-compose*.yml
 # Kubernetes
 infra/k8s/
 infra/docker/
+# Allow entrypoint script (needed for migrations)
+!infra/docker/entrypoint.sh
 
 # Scripts (usually not needed in container)
 scripts/

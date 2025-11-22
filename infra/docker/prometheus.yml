@@ -1,0 +1,60 @@
+# Prometheus Configuration for DoIt API
+#
+# This configuration tells Prometheus what to monitor and how often.
+#
+
+global:
+  scrape_interval: 15s # How often to scrape targets
+  evaluation_interval: 15s # How often to evaluate rules
+  external_labels:
+    cluster: "local"
+    environment: "development"
+
+# Alertmanager configuration (optional - for future use)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           # - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+# rule_files:
+#   - "alert_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          service: "prometheus"
+          environment: "development"
+
+  # DoIt API
+  - job_name: "doit-api"
+    scrape_interval: 10s # Scrape more frequently
+    metrics_path: "/metrics" # Your API should expose metrics here
+    static_configs:
+      - targets: ["api:8080"] # Service name:port
+        labels:
+          service: "doit-api"
+          environment: "development"
+          version: "1.0.0"
+
+  # PostgreSQL (if you add postgres_exporter in future)
+  # - job_name: "postgres"
+  #   static_configs:
+  #     - targets: ["postgres-exporter:9187"]
+  #       labels:
+  #         service: "postgres"
+  #         environment: "development"
+
+  # Redis (if you add redis_exporter in future)
+  # - job_name: "redis"
+  #   static_configs:
+  #     - targets: ["redis-exporter:9121"]
+  #       labels:
+  #         service: "redis"
+  #         environment: "development"
+
