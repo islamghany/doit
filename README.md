@@ -477,12 +477,1023 @@ User creates todo →
 
 ---
 
-## Phase 5: AWS Deployment Foundation
+## Phase 5: Kubernetes & Helm Charts
 
 **Duration:** Weeks 5-7  
+**Theme:** Master container orchestration with Kubernetes
+
+**Why Learn This Now:**
+
+- You already understand Docker containers (Phase 2.1)
+- You've orchestrated services with Docker Compose (Phase 2.2)
+- You have observability in place (Phase 3)
+- Now learn production-grade orchestration before cloud deployment
+
+**Learning Path:** Local K8s → Manifests → Helm → Production Patterns
+
+---
+
+### 5.1 Kubernetes Fundamentals
+
+**What you'll learn:**
+
+- Kubernetes architecture (Control Plane, Nodes, Pods)
+- Core concepts: Pods, Deployments, Services, ConfigMaps, Secrets
+- kubectl CLI and context management
+- Declarative vs imperative configuration
+- Kubernetes namespaces and resource organization
+- Label selectors and annotations
+
+**Setup Tasks:**
+
+- [ ] Install Docker Desktop with Kubernetes enabled (or minikube/kind)
+- [ ] Verify installation: `kubectl version`
+- [ ] Explore with: `kubectl get nodes`, `kubectl cluster-info`
+- [ ] Install k9s (terminal UI for K8s - highly recommended!)
+- [ ] Understand kubectl contexts: `kubectl config get-contexts`
+- [ ] Create a test namespace: `kubectl create namespace test`
+
+**Learning Exercises:**
+
+- [ ] Deploy nginx with `kubectl run` (imperative)
+- [ ] Expose nginx with `kubectl expose` (imperative)
+- [ ] Delete and recreate with YAML (declarative)
+- [ ] Understand the difference: imperative vs declarative
+
+**Architecture Understanding:**
+
+```
+Kubernetes Cluster
+├── Control Plane
+│   ├── API Server (kubectl talks to this)
+│   ├── Scheduler (assigns Pods to Nodes)
+│   ├── Controller Manager (maintains desired state)
+│   └── etcd (cluster state storage)
+└── Nodes (Worker machines)
+    └── Pods (smallest deployable unit)
+        └── Containers (your Docker images)
+```
+
+---
+
+### 5.2 Kubernetes Manifests for DoIt API
+
+**What you'll learn:**
+
+- Writing production-ready Kubernetes manifests
+- Resource limits and requests
+- Liveness and readiness probes
+- ConfigMaps for configuration
+- Secrets for sensitive data
+- Multi-container pods
+- Init containers for migrations
+
+**Project Structure:**
+
+```
+k8s/
+├── base/                       # Base manifests
+│   ├── namespace.yaml
+│   ├── configmap.yaml
+│   ├── secret.yaml
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   ├── postgres-deployment.yaml
+│   ├── postgres-service.yaml
+│   ├── postgres-pvc.yaml
+│   ├── redis-deployment.yaml
+│   └── redis-service.yaml
+├── overlays/                   # Environment-specific
+│   ├── dev/
+│   │   └── kustomization.yaml
+│   ├── staging/
+│   │   └── kustomization.yaml
+│   └── prod/
+│       └── kustomization.yaml
+└── README.md
+```
+
+**Implementation Tasks:**
+
+#### **5.2.1 Namespace**
+
+- [ ] Create namespace manifest (`k8s/base/namespace.yaml`)
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: doit
+  labels:
+    app: doit
+    environment: dev
+```
+
+#### **5.2.2 ConfigMap**
+
+- [ ] Create ConfigMap for non-sensitive config
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: doit-config
+  namespace: doit
+data:
+  APP_ENVIRONMENT: "production"
+  APP_NAME: "doit-api"
+  LOG_LEVEL: "info"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "doit"
+  REDIS_ADDR: "redis-service:6379"
+```
+
+#### **5.2.3 Secret**
+
+- [ ] Create Secret for sensitive data
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: doit-secrets
+  namespace: doit
+type: Opaque
+stringData:
+  DB_USER: "doit"
+  DB_PASSWORD: "changeme"
+  JWT_SECRET: "your-super-secret-key"
+  REDIS_PASSWORD: ""
+```
+
+- [ ] Learn about sealed-secrets for GitOps (store secrets safely in Git)
+
+#### **5.2.4 Deployment (Your API)**
+
+- [ ] Create Deployment manifest
+- [ ] Define resource requests and limits:
+  ```yaml
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  ```
+- [ ] Add liveness probe (is app alive?)
+  ```yaml
+  livenessProbe:
+    httpGet:
+      path: /health/liveness
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 30
+  ```
+- [ ] Add readiness probe (is app ready for traffic?)
+  ```yaml
+  readinessProbe:
+    httpGet:
+      path: /health/readiness
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  ```
+- [ ] Configure environment variables from ConfigMap and Secret
+- [ ] Set replica count: 3 (for high availability)
+- [ ] Add pod anti-affinity (spread across nodes)
+
+#### **5.2.5 Service**
+
+- [ ] Create Service to expose API
+- [ ] Type: ClusterIP (internal) or LoadBalancer (external)
+- [ ] Configure selectors to match Deployment labels
+- [ ] Expose port 80 → targetPort 8080
+
+#### **5.2.6 PostgreSQL Deployment**
+
+- [ ] Create PersistentVolumeClaim for database storage
+- [ ] Create PostgreSQL Deployment
+- [ ] Create PostgreSQL Service (ClusterIP - internal only)
+- [ ] Add init container for database initialization
+- [ ] Configure resource limits
+
+#### **5.2.7 Redis Deployment**
+
+- [ ] Create Redis Deployment
+- [ ] Create Redis Service
+- [ ] Configure persistence (if needed)
+- [ ] Set resource limits
+
+**Testing:**
+
+- [ ] Apply all manifests: `kubectl apply -f k8s/base/`
+- [ ] Check resources: `kubectl get all -n doit`
+- [ ] View logs: `kubectl logs -n doit deployment/doit-api`
+- [ ] Port-forward to test: `kubectl port-forward -n doit svc/doit-api 8080:80`
+- [ ] Test API: `curl http://localhost:8080/health`
+
+---
+
+### 5.3 Advanced Kubernetes Patterns
+
+**What you'll learn:**
+
+- Horizontal Pod Autoscaler (HPA)
+- Ingress controllers for routing
+- Network Policies for security
+- Pod Disruption Budgets (PDB)
+- Resource Quotas and Limits
+- StatefulSets vs Deployments
+
+#### **5.3.1 Horizontal Pod Autoscaler**
+
+**What you'll learn:**
+
+- Auto-scale based on CPU/memory
+- Custom metrics (requests per second)
+
+**Implementation:**
+
+- [ ] Install metrics-server (if not present)
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+
+- [ ] Create HPA manifest:
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: doit-api-hpa
+  namespace: doit
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: doit-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+```
+
+- [ ] Test auto-scaling with load (use `hey` or `ab`)
+- [ ] Watch scaling: `kubectl get hpa -n doit --watch`
+
+#### **5.3.2 Ingress Controller**
+
+**What you'll learn:**
+
+- L7 load balancing
+- Path-based routing
+- TLS/SSL termination
+- Multiple services behind one IP
+
+**Implementation:**
+
+- [ ] Install ingress-nginx controller
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+```
+
+- [ ] Create Ingress manifest:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: doit-ingress
+  namespace: doit
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.doit.example.com
+      secretName: doit-tls
+  rules:
+    - host: api.doit.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: doit-api
+                port:
+                  number: 80
+```
+
+- [ ] Test ingress routing
+- [ ] (Optional) Install cert-manager for automatic TLS certificates
+
+#### **5.3.3 Network Policies**
+
+**What you'll learn:**
+
+- Pod-to-pod network security
+- Zero-trust networking
+- Ingress and egress rules
+
+**Implementation:**
+
+- [ ] Create NetworkPolicy to restrict PostgreSQL access:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-network-policy
+  namespace: doit
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: doit-api # Only API can access Postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+```
+
+- [ ] Test that external access is blocked
+- [ ] Create similar policy for Redis
+
+#### **5.3.4 Pod Disruption Budget**
+
+**What you'll learn:**
+
+- Ensure availability during voluntary disruptions
+- Rolling updates without downtime
+
+**Implementation:**
+
+- [ ] Create PDB manifest:
+
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: doit-api-pdb
+  namespace: doit
+spec:
+  minAvailable: 2 # Always keep 2 pods running
+  selector:
+    matchLabels:
+      app: doit-api
+```
+
+---
+
+### 5.4 Helm Charts - Package Management for Kubernetes
+
+**What you'll learn:**
+
+- Helm architecture (Charts, Releases, Repositories)
+- Chart structure and templating
+- Values files for different environments
+- Helm hooks (pre-install, post-install)
+- Chart dependencies
+- Helm best practices
+
+**Why Helm:**
+
+- Reusable templates (deploy to dev/staging/prod with different values)
+- Version control for releases
+- Easy rollbacks
+- Share charts with team
+- Industry standard for K8s package management
+
+#### **5.4.1 Helm Basics**
+
+**Setup:**
+
+- [ ] Install Helm: `brew install helm` (macOS) or download from helm.sh
+- [ ] Verify: `helm version`
+- [ ] Add popular repos:
+
+```bash
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+```
+
+**Learning Exercises:**
+
+- [ ] Install PostgreSQL with Helm:
+
+```bash
+helm install my-postgres bitnami/postgresql -n doit
+```
+
+- [ ] List releases: `helm list -n doit`
+- [ ] Get values: `helm get values my-postgres -n doit`
+- [ ] Upgrade: `helm upgrade my-postgres bitnami/postgresql --set auth.password=newpass -n doit`
+- [ ] Rollback: `helm rollback my-postgres -n doit`
+- [ ] Uninstall: `helm uninstall my-postgres -n doit`
+
+#### **5.4.2 Create Your Own Helm Chart**
+
+**Chart Structure:**
+
+```
+helm/
+└── doit-api/
+    ├── Chart.yaml           # Chart metadata
+    ├── values.yaml          # Default values
+    ├── values-dev.yaml      # Dev environment overrides
+    ├── values-staging.yaml  # Staging overrides
+    ├── values-prod.yaml     # Production overrides
+    ├── templates/
+    │   ├── NOTES.txt       # Post-install notes
+    │   ├── _helpers.tpl    # Template helpers
+    │   ├── deployment.yaml
+    │   ├── service.yaml
+    │   ├── configmap.yaml
+    │   ├── secret.yaml
+    │   ├── ingress.yaml
+    │   ├── hpa.yaml
+    │   ├── serviceaccount.yaml
+    │   └── tests/
+    │       └── test-connection.yaml
+    └── .helmignore
+```
+
+**Implementation Tasks:**
+
+- [ ] Create chart skeleton:
+
+```bash
+helm create helm/doit-api
+```
+
+- [ ] Customize `Chart.yaml`:
+
+```yaml
+apiVersion: v2
+name: doit-api
+description: A Helm chart for DoIt REST API
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - doit
+  - api
+  - golang
+  - rest
+maintainers:
+  - name: Your Name
+    email: your.email@example.com
+```
+
+- [ ] Define `values.yaml` with sensible defaults:
+
+```yaml
+replicaCount: 3
+
+image:
+  repository: doit-api
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: api.doit.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+config:
+  appEnvironment: "production"
+  logLevel: "info"
+  dbHost: "postgres-service"
+  dbPort: "5432"
+  dbName: "doit"
+  redisAddr: "redis-service:6379"
+
+secrets:
+  dbUser: "doit"
+  dbPassword: "changeme"
+  jwtSecret: "your-secret-key"
+
+postgresql:
+  enabled: true
+  auth:
+    username: doit
+    password: changeme
+    database: doit
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+
+redis:
+  enabled: true
+  auth:
+    enabled: false
+```
+
+- [ ] Create environment-specific values files:
+  - `values-dev.yaml`: Lower resources, debug logging
+  - `values-staging.yaml`: Medium resources, realistic data
+  - `values-prod.yaml`: Full resources, monitoring enabled
+
+#### **5.4.3 Helm Templating**
+
+**What you'll learn:**
+
+- Go templating syntax
+- Built-in objects (`.Values`, `.Chart`, `.Release`)
+- Template functions (default, required, quote, toYaml)
+- Control structures (if, range, with)
+- Named templates and helpers
+
+**Example: Templated Deployment**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "doit-api.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "doit-api.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "doit-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "doit-api.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.targetPort }}
+          protocol: TCP
+        env:
+        - name: APP_ENVIRONMENT
+          value: {{ .Values.config.appEnvironment | quote }}
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "doit-api.fullname" . }}-secret
+              key: dbPassword
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+```
+
+**Tasks:**
+
+- [ ] Template all manifests
+- [ ] Create `_helpers.tpl` with reusable functions
+- [ ] Use `required` for mandatory values
+- [ ] Add conditional blocks (e.g., ingress enabled/disabled)
+- [ ] Test rendering: `helm template doit-api helm/doit-api`
+- [ ] Lint chart: `helm lint helm/doit-api`
+
+#### **5.4.4 Helm Dependencies**
+
+**What you'll learn:**
+
+- Including other charts as dependencies
+- Subchart values override
+- Managing external dependencies
+
+**Implementation:**
+
+- [ ] Add dependencies to `Chart.yaml`:
+
+```yaml
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "17.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: prometheus
+    version: "25.x.x"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: prometheus.enabled
+```
+
+- [ ] Update dependencies:
+
+```bash
+helm dependency update helm/doit-api
+```
+
+- [ ] This downloads subcharts to `charts/` directory
+- [ ] Override subchart values in your `values.yaml`
+
+#### **5.4.5 Helm Hooks**
+
+**What you'll learn:**
+
+- Run jobs before/after install, upgrade, delete
+- Database migrations as pre-upgrade hooks
+- Cleanup jobs as post-delete hooks
+
+**Use Cases:**
+
+- Run database migrations before deploying new version
+- Seed initial data on first install
+- Clean up resources on uninstall
+
+**Implementation:**
+
+- [ ] Create migration job with hook:
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "doit-api.fullname" . }}-migration
+  annotations:
+    "helm.sh/hook": pre-upgrade,pre-install
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: migration
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        command: ["migrate"]
+        args: ["-path", "/migrations", "-database", "$(DB_URL)", "up"]
+        env:
+        - name: DB_URL
+          value: "postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable"
+```
+
+- [ ] Test hook execution during install/upgrade
+
+#### **5.4.6 Chart Testing**
+
+- [ ] Create test in `templates/tests/test-connection.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "doit-api.fullname" . }}-test"
+  annotations:
+    "helm.sh/hook": test
+spec:
+  restartPolicy: Never
+  containers:
+  - name: wget
+    image: busybox
+    command: ['wget']
+    args: ['{{ include "doit-api.fullname" . }}:{{ .Values.service.port }}/health']
+```
+
+- [ ] Run tests:
+
+```bash
+helm test doit-api -n doit
+```
+
+---
+
+### 5.5 Deploying with Helm
+
+**Installation:**
+
+```bash
+# Install to dev environment
+helm install doit-api helm/doit-api \
+  -f helm/doit-api/values-dev.yaml \
+  -n doit-dev \
+  --create-namespace
+
+# Install to production
+helm install doit-api helm/doit-api \
+  -f helm/doit-api/values-prod.yaml \
+  -n doit-prod \
+  --create-namespace
+```
+
+**Upgrade:**
+
+```bash
+# Upgrade with new values
+helm upgrade doit-api helm/doit-api \
+  -f helm/doit-api/values-prod.yaml \
+  -n doit-prod
+
+# Upgrade with specific image tag
+helm upgrade doit-api helm/doit-api \
+  --set image.tag=v1.2.3 \
+  -n doit-prod
+```
+
+**Rollback:**
+
+```bash
+# View history
+helm history doit-api -n doit-prod
+
+# Rollback to previous version
+helm rollback doit-api -n doit-prod
+
+# Rollback to specific revision
+helm rollback doit-api 3 -n doit-prod
+```
+
+**Uninstall:**
+
+```bash
+helm uninstall doit-api -n doit-prod
+```
+
+**Tasks:**
+
+- [ ] Document installation procedure
+- [ ] Create Makefile targets:
+  - `make helm-install-dev`
+  - `make helm-install-prod`
+  - `make helm-upgrade-dev`
+  - `make helm-test`
+- [ ] Version your chart (update Chart.yaml on changes)
+- [ ] Package chart: `helm package helm/doit-api`
+- [ ] (Optional) Publish to chart repository
+
+---
+
+### 5.6 Observability in Kubernetes
+
+**What you'll learn:**
+
+- Prometheus Operator
+- Grafana in K8s
+- Service Monitors
+- Custom dashboards for K8s metrics
+
+**Implementation:**
+
+- [ ] Install kube-prometheus-stack via Helm:
+
+```bash
+helm install kube-prometheus prometheus-community/kube-prometheus-stack \
+  -n monitoring \
+  --create-namespace
+```
+
+This installs:
+
+- Prometheus Operator
+- Grafana
+- Alertmanager
+- Node Exporter
+- kube-state-metrics
+
+- [ ] Create ServiceMonitor for your API:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: doit-api
+  namespace: doit
+spec:
+  selector:
+    matchLabels:
+      app: doit-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+```
+
+- [ ] Access Grafana:
+
+```bash
+kubectl port-forward -n monitoring svc/kube-prometheus-grafana 3000:80
+```
+
+- [ ] Import Kubernetes dashboards
+- [ ] Create custom dashboard for your API
+
+---
+
+### 5.7 Production Kubernetes Best Practices
+
+**What you'll learn:**
+
+- Resource quotas per namespace
+- Limit ranges
+- Pod security policies/standards
+- RBAC (Role-Based Access Control)
+- Service accounts
+- Security contexts
+
+#### **5.7.1 Resource Quotas**
+
+```yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: doit-quota
+  namespace: doit-prod
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: 20Gi
+    limits.cpu: "20"
+    limits.memory: 40Gi
+    persistentvolumeclaims: "5"
+    services.loadbalancers: "2"
+```
+
+#### **5.7.2 Pod Security Standards**
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: doit-prod
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+```
+
+#### **5.7.3 RBAC**
+
+- [ ] Create ServiceAccount for your app
+- [ ] Create Role with minimal permissions
+- [ ] Bind Role to ServiceAccount
+- [ ] Use ServiceAccount in Deployment
+
+**Tasks:**
+
+- [ ] Implement all security best practices
+- [ ] Document security model
+- [ ] Run security scans (kubesec, kube-bench)
+
+---
+
+### 5.8 Local Kubernetes Testing Tools
+
+**Tools to master:**
+
+1. **k9s** - Terminal UI for K8s
+
+   ```bash
+   brew install k9s
+   k9s
+   ```
+
+2. **stern** - Multi-pod log tailing
+
+   ```bash
+   brew install stern
+   stern doit-api -n doit
+   ```
+
+3. **kubectx/kubens** - Context/namespace switching
+
+   ```bash
+   brew install kubectx
+   kubectx docker-desktop
+   kubens doit
+   ```
+
+4. **kustomize** - Template-free customization
+
+   ```bash
+   kubectl apply -k k8s/overlays/dev/
+   ```
+
+5. **helm diff** - Preview changes
+   ```bash
+   helm plugin install https://github.com/databus23/helm-diff
+   helm diff upgrade doit-api helm/doit-api -n doit
+   ```
+
+---
+
+### 5.9 CI/CD with Kubernetes & Helm
+
+**What you'll learn:**
+
+- Automated Helm deployments
+- Image tagging strategies
+- ArgoCD for GitOps (optional)
+
+**GitHub Actions Workflow:**
+
+```yaml
+name: Deploy to Kubernetes
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t doit-api:${{ github.sha }} .
+
+      - name: Push to registry
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+          docker push doit-api:${{ github.sha }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install doit-api helm/doit-api \
+            --set image.tag=${{ github.sha }} \
+            -f helm/doit-api/values-dev.yaml \
+            -n doit-dev \
+            --create-namespace
+```
+
+**Tasks:**
+
+- [ ] Set up CI/CD pipeline for K8s
+- [ ] Implement proper image tagging (git SHA, semver)
+- [ ] Add smoke tests after deployment
+- [ ] Configure rollback on failure
+
+---
+
+## Phase 6: AWS Deployment Foundation
+
+**Duration:** Weeks 7-9  
 **Theme:** Deploy to real cloud infrastructure
 
-### 5.1 AWS Account Setup & Fundamentals
+**Note:** Now that you understand Kubernetes, you can choose between ECS (simpler, managed) or EKS (Kubernetes on AWS). Both paths are covered below.
+
+### 6.1 AWS Account Setup & Fundamentals
 
 **What you'll learn:**
 
@@ -510,7 +1521,7 @@ User creates todo →
 
 ---
 
-### 5.2 Infrastructure as Code (Terraform)
+### 6.2 Infrastructure as Code (Terraform)
 
 **What you'll learn:**
 
@@ -560,7 +1571,7 @@ infrastructure/
 
 ---
 
-### 5.3 Deployment Strategy: ECS Fargate ⭐ Recommended
+### 6.3 Deployment Path A: ECS Fargate (Simpler, Managed)
 
 **What you'll learn:**
 
@@ -618,37 +1629,457 @@ ECS Fargate Tasks (your Go app - auto-scaled)
 
 ---
 
-### 5.4 Alternative: EKS (Kubernetes on AWS) - Advanced
+### 6.4 Deployment Path B: EKS (Kubernetes on AWS) - Production Grade
 
 **What you'll learn:**
 
-- Kubernetes on cloud
-- EKS cluster management
-- kubectl and Helm
-- Kubernetes manifests (Deployments, Services, ConfigMaps, Secrets)
-- Ingress controllers
-- Pod autoscaling (HPA)
+- EKS cluster provisioning with Terraform
+- AWS-specific Kubernetes integrations
+- AWS Load Balancer Controller
+- EKS IAM roles for service accounts (IRSA)
+- Amazon EBS CSI driver for storage
+- AWS Secrets Manager integration
+- EKS managed node groups
+- Cluster autoscaler
+- Cost optimization strategies
+
+**Why Choose EKS:**
+
+- ✅ You already know Kubernetes (Phase 5)
+- ✅ Portable skills (works on any K8s cluster)
+- ✅ More control and flexibility
+- ✅ Strong ecosystem (Helm, operators, etc.)
+- ✅ Multi-cloud strategy possible
+- ⚠️ More complex than ECS
+- ⚠️ More expensive (control plane + nodes)
+
+**Architecture:**
+
+```
+Internet
+  ↓
+AWS Load Balancer (ALB - created by Ingress)
+  ↓
+EKS Cluster
+  ├─ Control Plane (AWS managed)
+  └─ Worker Nodes (EC2 instances - auto-scaled)
+      ├─ doit-api Pods (3+ replicas)
+      ├─ Ingress Controller Pods
+      └─ Monitoring Pods (Prometheus, Grafana)
+
+Connected to:
+├─→ RDS PostgreSQL (private subnet)
+├─→ ElastiCache Redis (private subnet)
+└─→ AWS Secrets Manager
+```
 
 **Implementation Tasks:**
 
-- [ ] Create EKS cluster (Terraform)
-- [ ] Configure kubectl
-- [ ] Create Kubernetes manifests:
-  - [ ] Deployment for your app
-  - [ ] Service (LoadBalancer or ClusterIP)
-  - [ ] ConfigMap for configuration
-  - [ ] Secret for sensitive data
-  - [ ] HorizontalPodAutoscaler
-- [ ] Install ingress controller (AWS ALB Ingress Controller)
-- [ ] Deploy with `kubectl apply`
-- [ ] Set up Helm chart (optional)
-- [ ] Configure monitoring (Prometheus Operator)
+#### **6.4.1 EKS Cluster Creation (Terraform)**
 
-**Note:** More expensive than ECS, but more powerful and transferable skills
+- [ ] Create VPC module for EKS
+
+```hcl
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
+
+  name = "doit-eks-vpc"
+  cidr = "10.0.0.0/16"
+
+  azs             = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+  enable_nat_gateway   = true
+  single_nat_gateway   = false  # High availability
+  enable_dns_hostnames = true
+
+  # Tags for EKS
+  public_subnet_tags = {
+    "kubernetes.io/role/elb" = "1"
+  }
+
+  private_subnet_tags = {
+    "kubernetes.io/role/internal-elb" = "1"
+  }
+}
+```
+
+- [ ] Create EKS cluster module
+
+```hcl
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 19.0"
+
+  cluster_name    = "doit-eks"
+  cluster_version = "1.28"
+
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnets
+
+  # OIDC provider for IRSA
+  enable_irsa = true
+
+  # Managed node groups
+  eks_managed_node_groups = {
+    general = {
+      desired_size = 2
+      min_size     = 2
+      max_size     = 10
+
+      instance_types = ["t3.medium"]
+      capacity_type  = "ON_DEMAND"
+
+      labels = {
+        role = "general"
+      }
+
+      tags = {
+        Environment = "production"
+      }
+    }
+  }
+
+  # Cluster add-ons
+  cluster_addons = {
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+    }
+    aws-ebs-csi-driver = {
+      most_recent = true
+    }
+  }
+}
+```
+
+- [ ] Apply Terraform:
+
+```bash
+cd infrastructure/terraform/environments/prod
+terraform init
+terraform plan
+terraform apply
+```
+
+- [ ] Configure kubectl:
+
+```bash
+aws eks update-kubeconfig --name doit-eks --region us-east-1
+kubectl get nodes
+```
+
+#### **6.4.2 AWS Load Balancer Controller**
+
+**What it does:** Creates AWS ALB/NLB from Kubernetes Ingress
+
+- [ ] Create IAM role for controller (IRSA):
+
+```hcl
+module "aws_load_balancer_controller_irsa_role" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
+
+  role_name = "aws-load-balancer-controller"
+
+  attach_load_balancer_controller_policy = true
+
+  oidc_providers = {
+    ex = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
+    }
+  }
+}
+```
+
+- [ ] Install controller via Helm:
+
+```bash
+helm repo add eks https://aws.github.io/eks-charts
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=doit-eks \
+  --set serviceAccount.create=true \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::ACCOUNT:role/aws-load-balancer-controller"
+```
+
+- [ ] Verify installation:
+
+```bash
+kubectl get deployment -n kube-system aws-load-balancer-controller
+```
+
+#### **6.4.3 Deploy Your Helm Chart to EKS**
+
+- [ ] Create production values for EKS (`values-eks-prod.yaml`):
+
+```yaml
+image:
+  repository: ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/doit-api
+  tag: "v1.0.0"
+
+replicaCount: 3
+
+ingress:
+  enabled: true
+  className: alb # Use AWS ALB
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID
+  hosts:
+    - host: api.doit.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+config:
+  dbHost: doit-prod.xxxxx.us-east-1.rds.amazonaws.com # RDS endpoint
+  dbPort: "5432"
+  dbName: doit
+  redisAddr: doit-redis.xxxxx.cache.amazonaws.com:6379 # ElastiCache endpoint
+
+# Don't deploy PostgreSQL/Redis in K8s - use AWS managed services
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+# Use AWS Secrets Manager via External Secrets Operator (see below)
+externalSecrets:
+  enabled: true
+```
+
+- [ ] Deploy:
+
+```bash
+helm upgrade --install doit-api helm/doit-api \
+  -f helm/doit-api/values-eks-prod.yaml \
+  -n doit-prod \
+  --create-namespace
+```
+
+- [ ] Verify:
+
+```bash
+kubectl get all -n doit-prod
+kubectl get ingress -n doit-prod
+```
+
+#### **6.4.4 AWS Secrets Manager Integration**
+
+**Why:** Store secrets in AWS Secrets Manager, not in K8s Secrets
+
+- [ ] Install External Secrets Operator:
+
+```bash
+helm repo add external-secrets https://charts.external-secrets.io
+helm install external-secrets external-secrets/external-secrets \
+  -n external-secrets-system \
+  --create-namespace
+```
+
+- [ ] Create IAM role for External Secrets (IRSA)
+- [ ] Create SecretStore:
+
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: aws-secrets-manager
+  namespace: doit-prod
+spec:
+  provider:
+    aws:
+      service: SecretsManager
+      region: us-east-1
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: external-secrets-sa
+```
+
+- [ ] Create ExternalSecret:
+
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: doit-secrets
+  namespace: doit-prod
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: SecretStore
+  target:
+    name: doit-secrets
+    creationPolicy: Owner
+  data:
+    - secretKey: dbPassword
+      remoteRef:
+        key: doit/prod/database
+        property: password
+    - secretKey: jwtSecret
+      remoteRef:
+        key: doit/prod/jwt
+        property: secret
+```
+
+#### **6.4.5 Cluster Autoscaler**
+
+**What it does:** Automatically adds/removes nodes based on demand
+
+- [ ] Create IAM role for Cluster Autoscaler (IRSA)
+- [ ] Install via Helm:
+
+```bash
+helm repo add autoscaler https://kubernetes.github.io/autoscaler
+helm install cluster-autoscaler autoscaler/cluster-autoscaler \
+  -n kube-system \
+  --set autoDiscovery.clusterName=doit-eks \
+  --set awsRegion=us-east-1 \
+  --set rbac.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::ACCOUNT:role/cluster-autoscaler"
+```
+
+- [ ] Test autoscaling:
+
+```bash
+# Scale up workload
+kubectl scale deployment doit-api -n doit-prod --replicas=20
+
+# Watch nodes being added
+kubectl get nodes --watch
+```
+
+#### **6.4.6 Monitoring on EKS**
+
+- [ ] Install kube-prometheus-stack (if not already installed from Phase 5):
+
+```bash
+helm install kube-prometheus prometheus-community/kube-prometheus-stack \
+  -n monitoring \
+  --create-namespace \
+  -f values-prometheus-eks.yaml
+```
+
+- [ ] Expose Grafana via Ingress:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: monitoring
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+spec:
+  ingressClassName: alb
+  rules:
+    - host: grafana.doit.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-grafana
+                port:
+                  number: 80
+```
+
+- [ ] Access Grafana at https://grafana.doit.example.com
+
+#### **6.4.7 Cost Optimization for EKS**
+
+- [ ] Use Spot Instances for non-critical workloads:
+
+```hcl
+eks_managed_node_groups = {
+  spot = {
+    desired_size = 2
+    min_size     = 1
+    max_size     = 10
+
+    instance_types = ["t3.medium", "t3a.medium"]
+    capacity_type  = "SPOT"
+
+    labels = {
+      role = "spot"
+    }
+
+    taints = [{
+      key    = "spot"
+      value  = "true"
+      effect = "NoSchedule"
+    }]
+  }
+}
+```
+
+- [ ] Configure pod tolerations for spot:
+
+```yaml
+tolerations:
+  - key: "spot"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+```
+
+- [ ] Use Karpenter for more advanced autoscaling (optional)
+- [ ] Set resource requests accurately
+- [ ] Use Horizontal Pod Autoscaler (already configured in Phase 5)
+- [ ] Use Vertical Pod Autoscaler for right-sizing
+
+#### **6.4.8 EKS Production Checklist**
+
+- [ ] Enable EKS control plane logging
+- [ ] Configure pod security standards
+- [ ] Set up network policies
+- [ ] Enable EKS Secrets encryption (KMS)
+- [ ] Configure IAM roles for service accounts (IRSA) for all workloads
+- [ ] Set up AWS CloudWatch Container Insights
+- [ ] Configure cluster and node backups (Velero)
+- [ ] Set up multi-AZ deployment
+- [ ] Document incident response procedures
+- [ ] Test disaster recovery
+
+**Deliverable:** Production-grade Kubernetes cluster on AWS with your application running! 🚀
+
+**Comparison: ECS vs EKS**
+
+| Aspect             | ECS Fargate (6.3) | EKS (6.4)              |
+| ------------------ | ----------------- | ---------------------- |
+| **Complexity**     | Lower             | Higher                 |
+| **Cost**           | $$                | $$$                    |
+| **Learning Curve** | Easier            | Steeper                |
+| **Portability**    | AWS only          | Any cloud              |
+| **Control**        | Less              | More                   |
+| **Ecosystem**      | Limited           | Rich (Helm, Operators) |
+| **Best For**       | AWS-first teams   | K8s-first teams        |
+
+**Recommendation:**
+
+- Choose **ECS** if you want simpler ops and AWS lock-in is OK
+- Choose **EKS** if you want Kubernetes skills and multi-cloud portability
 
 ---
 
-### 5.5 AWS Services Integration
+### 6.5 AWS Services Integration
 
 #### Database (RDS)
 
@@ -699,12 +2130,12 @@ ECS Fargate Tasks (your Go app - auto-scaled)
 
 ---
 
-## Phase 6: Advanced DevOps & CI/CD
+## Phase 7: Advanced DevOps & CI/CD
 
-**Duration:** Weeks 7-9  
+**Duration:** Weeks 9-11  
 **Theme:** Automate everything
 
-### 6.1 CI/CD Pipeline Enhancement
+### 7.1 CI/CD Pipeline Enhancement
 
 **Current State:** CI only (testing, security scanning)  
 **Goal:** Full CI/CD with automated deployments
@@ -750,7 +2181,7 @@ GitHub Actions CI:
 
 ---
 
-### 6.2 Database Migration Strategy
+### 7.2 Database Migration Strategy
 
 **What you'll learn:**
 
@@ -780,7 +2211,7 @@ GitHub Actions CI:
 
 ---
 
-### 6.3 Environment Management
+### 7.3 Environment Management
 
 **What you'll learn:**
 
@@ -805,7 +2236,7 @@ GitHub Actions CI:
 
 ---
 
-### 6.4 Disaster Recovery & Backups
+### 7.4 Disaster Recovery & Backups
 
 **What you'll learn:**
 
@@ -834,12 +2265,12 @@ GitHub Actions CI:
 
 ---
 
-## Phase 7: Advanced Architecture Patterns
+## Phase 8: Advanced Architecture Patterns
 
-**Duration:** Weeks 9-11  
+**Duration:** Weeks 11-13  
 **Theme:** Scale and resilience patterns
 
-### 7.1 API Gateway Pattern
+### 8.1 API Gateway Pattern
 
 **What you'll learn:**
 
@@ -866,7 +2297,7 @@ GitHub Actions CI:
 
 ---
 
-### 7.2 Background Jobs & Queues
+### 8.2 Background Jobs & Queues
 
 **What you'll learn:**
 
