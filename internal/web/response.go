@@ -38,3 +38,7 @@ func RespondNoContent(w http.ResponseWriter, r *http.Request) error {
 	w.WriteHeader(http.StatusNoContent)
 	return nil
 }
+
+func SetResponseHeader(w http.ResponseWriter, key, value string) {
+	w.Header().Set(key, value)
+}

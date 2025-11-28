@@ -40,7 +40,6 @@ type Record struct {
 
 // toRecord convert the slog.Record to logger.Record.
 func toRecord(r slog.Record) Record {
-
 	attrs := make(map[string]interface{}, r.NumAttrs())
 	f := func(attr slog.Attr) bool {
 		attrs[attr.Key] = attr.Value.Any()
@@ -60,21 +59,25 @@ func toRecord(r slog.Record) Record {
 // TraceIDFunc is the function that will be used to get the trace id from the context.
 type TraceIDFunc func(ctx context.Context) string
 
+// RequestIDFunc is the function that will be used to get the request id from the context.
+type RequestIDFunc func(ctx context.Context) string
+
 // Logger is the logger struct that will be used to log the events.
 type Logger struct {
-	traceIDFunc TraceIDFunc
-	handler     slog.Handler
+	traceIDFunc   TraceIDFunc
+	handler       slog.Handler
+	requestIDFunc RequestIDFunc
 }
 
-func New(w io.Writer, minLevel Level, serviceName string, traceIDFunc TraceIDFunc) *Logger {
-	return new(w, minLevel, serviceName, traceIDFunc, Events{})
+func New(w io.Writer, minLevel Level, serviceName string, traceIDFunc TraceIDFunc, requestIDFunc RequestIDFunc) *Logger {
+	return new(w, minLevel, serviceName, traceIDFunc, requestIDFunc, Events{})
 }
 
-func NewWithEvents(w io.Writer, minLevel Level, serviceName string, traceIDFunc TraceIDFunc, events Events) *Logger {
-	return new(w, minLevel, serviceName, traceIDFunc, events)
+func NewWithEvents(w io.Writer, minLevel Level, serviceName string, traceIDFunc TraceIDFunc, requestIDFunc RequestIDFunc, events Events) *Logger {
+	return new(w, minLevel, serviceName, traceIDFunc, requestIDFunc, events)
 }
 
-func new(w io.Writer, minLevel Level, serviceName string, traceIDFunc TraceIDFunc, events Events) *Logger {
+func new(w io.Writer, minLevel Level, serviceName string, traceIDFunc TraceIDFunc, requestIDFunc RequestIDFunc, events Events) *Logger {
 	// Convert the file name to just the name.ext when logging.
 	f := func(groups []string, a slog.Attr) slog.Attr {
 		if a.Key == slog.SourceKey {
@@ -107,8 +110,9 @@ func new(w io.Writer, minLevel Level, serviceName string, traceIDFunc TraceIDFun
 	handler = handler.WithAttrs(attrs)
 
 	return &Logger{
-		traceIDFunc: traceIDFunc,
-		handler:     handler,
+		traceIDFunc:   traceIDFunc,
+		requestIDFunc: requestIDFunc,
+		handler:       handler,
 	}
 }
 
@@ -124,6 +128,10 @@ func (l *Logger) write(ctx context.Context, level Level, caller int, msg string,
 	r := slog.NewRecord(time.Now(), slogLevel, msg, pcs[0])
 	if l.traceIDFunc != nil {
 		args = append(args, slog.String("trace_id", l.traceIDFunc(ctx)))
+	}
+
+	if l.requestIDFunc != nil {
+		args = append(args, slog.String("request_id", l.requestIDFunc(ctx)))
 	}
 
 	r.Add(args...)

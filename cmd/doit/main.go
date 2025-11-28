@@ -114,6 +114,11 @@ func setupLogger(cfg *config.Config) *logger.Logger {
 		return web.GetTraceID(ctx)
 	}
 
+	// RequestID function
+	requestIDFunc := func(ctx context.Context) string {
+		return web.GetRequestIDFromContext(ctx)
+	}
+
 	// Event callbacks
 	events := logger.Events{
 		Error: func(ctx context.Context, r logger.Record) {
@@ -122,5 +127,5 @@ func setupLogger(cfg *config.Config) *logger.Logger {
 		},
 	}
 
-	return logger.NewWithEvents(os.Stdout, minLevel, "doit", traceIDFunc, events)
+	return logger.NewWithEvents(os.Stdout, minLevel, "doit", traceIDFunc, requestIDFunc, events)
 }

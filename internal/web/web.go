@@ -36,6 +36,14 @@ func (wa *WebApp) handle(method, path string, handler Handler) {
 			TraceID: uuid.New().String(),
 			Time:    time.Now(),
 		})
+		requestID := GetRequestIDHeader(r)
+		if requestID == "" {
+			requestID = uuid.New().String()
+		}
+		ctx = SetRequestIDForContext(ctx, requestID)
+
+		SetResponseHeader(w, RequestIDHeader, requestID)
+
 		if err := handler(w, r.WithContext(ctx)); err != nil {
 			log.Println(err)
 		}

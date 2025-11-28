@@ -68,6 +68,7 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool,
 	})
 
 	app.Handle("GET", "/public", func(w http.ResponseWriter, r *http.Request) error {
+		logger.Info(r.Context(), "Public endpoint hit")
 		return web.RespondOK(w, r, map[string]string{"status": "ok", "message": "Hello, World!"})
 	})
 

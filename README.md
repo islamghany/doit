@@ -290,14 +290,14 @@ make compose-down-v    # Stop and remove volumes
 
 **Implementation Tasks:**
 
-- [ ] Enhance existing logger with structured fields
-- [ ] Add request ID middleware (X-Request-ID header)
-- [ ] Propagate request ID through context
-- [ ] Add user ID to log context (after auth)
-- [ ] Log important events (auth attempts, data mutations)
-- [ ] Configure log levels by environment
-- [ ] Add log sampling for high-volume endpoints
-- [ ] Format logs as JSON for production
+- [x] Enhance existing logger with structured fields
+- [x] Add request ID middleware (X-Request-ID header)
+- [x] Propagate request ID through context
+- [x] Add user ID to log context (after auth)
+- [x] Log important events (auth attempts, data mutations)
+- [x] Configure log levels by environment
+- [x] Add log sampling for high-volume endpoints
+- [x] Format logs as JSON for production
 
 **Architecture Pattern:** Context propagation through middleware stack
 
