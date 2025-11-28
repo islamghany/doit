@@ -6,6 +6,7 @@ import (
 
 	"doit/api/v1/auth"
 	healthcheck "doit/api/v1/health_check"
+	"doit/api/v1/todo"
 	_ "doit/docs" // Import generated swagger docs
 	"doit/internal/cache"
 	"doit/internal/config"
@@ -35,6 +36,7 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool,
 	tokenService := service.NewTokenService(dbPool, tokenMaker,
 		cfg.JWT.AccessTokenExp,
 		cfg.JWT.RefreshTokenExp)
+	todoService := service.NewTodoService(dbPool)
 
 	// Middlewares
 	corsMiddleware := middlewares.CORSMiddleware(cfg)
@@ -49,10 +51,12 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool,
 	// Handlers
 	authHandler := auth.NewHandler(logger, userService, tokenService, cfg)
 	healthcheckHandler := healthcheck.NewHandler(logger, dbPool, cache, cfg.App.Version)
+	todoHandler := todo.NewHandler(logger, todoService)
 
 	// Routes
 	auth.RegisterRoutes(app, authHandler, rateLimiter)
 	healthcheck.RegisterRoutes(app, healthcheckHandler)
+	todo.RegisterRoutes(app, todoHandler, authMiddleware)
 
 	// Swagger documentation endpoint
 	// Access at: http://localhost:8080/swagger/index.html

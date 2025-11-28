@@ -1,12 +1,13 @@
 package web
 
 import (
-	"doit/pkg/validator"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"doit/pkg/validator"
 
 	"github.com/google/uuid"
 )
