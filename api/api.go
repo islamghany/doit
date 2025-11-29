@@ -2,15 +2,20 @@ package api
 
 import (
 	"context"
+	"expvar"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
+	_ "net/http/pprof"
+
 	"doit/internal/cache"
 	"doit/internal/config"
+	"doit/internal/debug"
 	"doit/pkg/database"
 	"doit/pkg/logger"
 	"doit/pkg/retry"
@@ -77,6 +82,22 @@ func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
 	go func() {
 		logger.Info(ctx, "Starting the HTTP server on", "address", server.Addr)
 		shutdownError <- server.ListenAndServe()
+	}()
+
+	// Starting the debug server
+	w := sync.WaitGroup{}
+	w.Add(1)
+	go func() {
+		defer w.Done()
+
+		expvar.NewString("version").Set(cfg.App.Version)
+		expvar.NewString("environment").Set(string(cfg.App.Environment))
+
+		logger.Info(ctx, "Starting the debug server on", "address", fmt.Sprintf(":%d", cfg.Server.DebugPort))
+
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.Server.DebugPort), debug.Mux()); err != nil {
+			logger.Error(ctx, "shutdown", "status", "debug v1 router cloased", "host", cfg.Server.DebugPort)
+		}
 	}()
 
 	shutdownChan := make(chan os.Signal, 1)

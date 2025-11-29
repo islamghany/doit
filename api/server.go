@@ -44,9 +44,10 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool,
 	errorMiddleware := middlewares.ErrorMiddleware(logger)
 	authMiddleware := middlewares.AuthMiddleware(tokenService)
 	securityHeadersMiddleware := middlewares.SecurityHeaders()
+	metricsMiddleware := middlewares.Metrics()
 
 	// Web App
-	app := web.NewApp(panicMiddleware, errorMiddleware, securityHeadersMiddleware, corsMiddleware)
+	app := web.NewApp(errorMiddleware, metricsMiddleware, panicMiddleware, securityHeadersMiddleware, corsMiddleware)
 
 	// Handlers
 	authHandler := auth.NewHandler(logger, userService, tokenService, cfg)

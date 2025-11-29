@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
+	"doit/internal/metrics"
 	"doit/internal/web"
 )
 
@@ -15,6 +16,7 @@ func PanicMiddleware() web.MiddleWare {
 				if recErr := recover(); recErr != nil {
 					trace := debug.Stack()
 					err = fmt.Errorf("panic [%v] trace[%s]", recErr, trace)
+					metrics.AddPanics(r.Context())
 				}
 			}()
 			return handler(w, r)

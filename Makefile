@@ -503,3 +503,13 @@ vuln-check:
 # Run all checks (CI simulation)
 ci: lint test security vuln-check
 	@echo "✅ All CI checks passed!"
+
+
+## Metrics and Tracing
+
+metrics-view-sc:
+	expvarmon -ports="localhost:8001" -vars="build,requests,goroutines,errors,panics,mem:memstats.HeapAlloc,mem:memstats.HeapSys,mem:memstats.Sys"
+
+metrics-view:
+	expvarmon -ports="localhost:4020" -endpoint="/metrics" -vars="build,requests,goroutines,errors,panics,mem:memstats.HeapAlloc,mem:memstats.HeapSys,mem:memstats.Sys"
+
