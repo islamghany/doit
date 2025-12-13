@@ -15,6 +15,7 @@ import (
 	"doit/internal/cache"
 	"doit/internal/config"
 	"doit/internal/debug"
+	"doit/internal/metrics"
 	"doit/pkg/database"
 	"doit/pkg/logger"
 	"doit/pkg/retry"
@@ -62,6 +63,36 @@ func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
 	}
 	defer cache.Close()
 
+	// Start metrics collector
+	metrics.StartRuntimeMetricsCollector(15 * time.Second)
+	// Start DB pool metrics collector
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				stat := dbPool.Stat()
+				metrics.UpdateDBPoolMetrics(
+					stat.TotalConns(),
+					stat.AcquiredConns(),
+					stat.IdleConns(),
+				)
+				// SATURATION: ratio of acquired to max
+				if stat.MaxConns() > 0 {
+					saturation := float64(stat.AcquiredConns()) / float64(stat.MaxConns())
+					metrics.DBPoolSaturation.Set(saturation)
+				}
+
+				// Track empty acquires (had to wait for connection)
+				// Note: This is cumulative, so you'd query rate() in PromQL
+				metrics.DBPoolWaitCount.Add(float64(stat.EmptyAcquireCount()))
+			}
+		}
+	}()
+
 	// Starting the HTTP server with graceful shutdown
 	srv, err := NewServer(logger, cfg, dbPool, cache)
 	if err != nil {
@@ -81,7 +112,7 @@ func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
 	expvar.NewString("environment").Set(string(cfg.App.Environment))
 
 	debugServer := &http.Server{
-		Addr:    fmt.Sprintf("127.0.0.1:%d", cfg.Server.DebugPort),
+		Addr:    fmt.Sprintf(":%d", cfg.Server.DebugPort),
 		Handler: debug.Mux(),
 	}
 	// Channel to collect server errors

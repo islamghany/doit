@@ -46,7 +46,7 @@ type ServerConfig struct {
 	WriteTimeout    int    `env:"WRITE_TIMEOUT" flag:"write_timeout" default:"10"`       // seconds
 	IdleTimeout     int    `env:"IDLE_TIMEOUT" flag:"idle_timeout" default:"120"`        // seconds
 	ShutdownTimeout int    `env:"SHUTDOWN_TIMEOUT" flag:"shutdown_timeout" default:"25"` // seconds
-	DebugPort       int    `env:"DEBUG_PORT" flag:"debug_port" default:"8081"`           // port for the debug server
+	DebugPort       int    `env:"DEBUG_PORT" flag:"debug_port" default:"6060"`           // port for the debug server
 }
 
 type AppConfig struct {

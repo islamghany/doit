@@ -35,7 +35,7 @@ func NewHandler(log *logger.Logger, userService *service.UserService, tokenServi
 // @Success      200 {object} model.User "Successfully created user account"
 // @Failure      400 {object} ErrorResponse "Invalid input, duplicate email, or duplicate username"
 // @Failure      500 {object} ErrorResponse "Internal server error"
-// @Router       /auth/register [post]
+// @Router       /v1/auth/register [post]
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
@@ -80,7 +80,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) error {
 // @Failure      401 {object} ErrorResponse "Invalid credentials (wrong email or password)"
 // @Failure      429 {object} ErrorResponse "Rate limit exceeded"
 // @Failure      500 {object} ErrorResponse "Internal server error"
-// @Router       /auth/login [post]
+// @Router       /v1/auth/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
@@ -127,7 +127,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) error {
 // @Failure      400 {object} ErrorResponse "Missing refresh token header"
 // @Failure      401 {object} ErrorResponse "Invalid, expired, or already-used refresh token"
 // @Failure      500 {object} ErrorResponse "Internal server error"
-// @Router       /auth/refresh [post]
+// @Router       /v1/auth/refresh [post]
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
@@ -171,7 +171,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) error {
 // @Success      200 {object} MessageResponse "Logged out successfully"
 // @Failure      400 {object} ErrorResponse "Missing refresh token header"
 // @Failure      500 {object} ErrorResponse "Internal server error"
-// @Router       /auth/logout [post]
+// @Router       /v1/auth/logout [post]
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
@@ -199,7 +199,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) error {
 // @Success      200 {object} MessageResponse "Logged out from all devices successfully"
 // @Failure      401 {object} ErrorResponse "Unauthorized - missing or invalid access token"
 // @Failure      500 {object} ErrorResponse "Internal server error"
-// @Router       /auth/logout/all [post]
+// @Router       /v1/auth/logout/all [post]
 func (h *Handler) LogoutAll(w http.ResponseWriter, r *http.Request) error {
 	// userID := web.GetUserID(r)
 	// 2. Revoke all user tokens
@@ -220,6 +220,6 @@ func (h *Handler) handleAuthError(err error) error {
 	// case errors.Is(err, service.ErrUserInactive):
 	// 	return web.NewError(errors.New("user account is inactive"), http.StatusForbidden)
 	default:
-		return web.NewError(errors.New("internal server error"), http.StatusInternalServerError)
+		return err
 	}
 }

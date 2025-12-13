@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"doit/internal/metrics"
+
 	"github.com/redis/go-redis/v9"
 )
 
@@ -117,15 +119,16 @@ func (c *RedisCache) Get(ctx context.Context, key string) (any, error) {
 	if err := validateKey(key); err != nil {
 		return nil, err
 	}
-
 	data, err := c.client.Get(ctx, key).Bytes()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
+			metrics.RecordCacheOperation("get", "redis", false) // miss
 			return nil, ErrCacheMiss
 		}
 		return nil, fmt.Errorf("%w: %v", ErrConnection, err)
 	}
 
+	metrics.RecordCacheOperation("get", "redis", true) // hit
 	// Deserialize
 	var result any
 	if err := c.serializer.Unmarshal(data, &result); err != nil {

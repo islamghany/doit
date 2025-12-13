@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"doit/internal/data/db"
+	"doit/internal/metrics"
 	"doit/internal/model"
 	"doit/pkg/database"
 	"doit/pkg/validator"
@@ -83,6 +85,7 @@ func (s *TodoService) CreateTodo(ctx context.Context, input model.CreateTodoInpu
 		tags = []string{}
 	}
 
+	start := time.Now()
 	todo, err := s.querier.CreateTodo(ctx, db.CreateTodoParams{
 		ID:          uuid.New(),
 		UserID:      input.UserID,
@@ -94,16 +97,23 @@ func (s *TodoService) CreateTodo(ctx context.Context, input model.CreateTodoInpu
 		Metadata:    metadataJSON,
 		DueDate:     dueDate,
 	})
+	duration := time.Since(start).Seconds()
+	metrics.RecordDatabaseQuery("create_todo", "todos", duration, err)
 	if err != nil {
 		return nil, ErrTodoNotFound
 	}
 
+	// Record business metric
+	metrics.RecordTodoOperation("create")
 	return s.toTodoModel(todo), nil
 }
 
 // GetTodoByID retrieves a todo by ID
 func (s *TodoService) GetTodoByID(ctx context.Context, todoID uuid.UUID, userID uuid.UUID) (*model.Todo, error) {
+	start := time.Now()
 	todo, err := s.querier.GetTodoByID(ctx, todoID)
+	duration := time.Since(start).Seconds()
+	metrics.RecordDatabaseQuery("get_todo_by_id", "todos", duration, err)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrTodoNotFound
@@ -116,20 +126,27 @@ func (s *TodoService) GetTodoByID(ctx context.Context, todoID uuid.UUID, userID 
 		return nil, err
 	}
 
+	// Record business metric
+	metrics.RecordTodoOperation("read")
 	return s.toTodoModel(todo), nil
 }
 
 // ListUserTodos retrieves paginated todos for a user
 func (s *TodoService) ListUserTodos(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]*model.Todo, error) {
+	start := time.Now()
 	todos, err := s.querier.ListTodosByUser(ctx, db.ListTodosByUserParams{
 		UserID: userID,
 		Limit:  limit,
 		Offset: offset,
 	})
+	duration := time.Since(start).Seconds()
+	metrics.RecordDatabaseQuery("list_user_todos", "todos", duration, err)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list todos: %w", err)
 	}
 
+	// Record business metric
+	metrics.RecordTodoOperation("list")
 	return s.toTodoModels(todos), nil
 }
 
@@ -210,8 +227,11 @@ func (s *TodoService) UpdateTodo(ctx context.Context, todoID uuid.UUID, userID u
 			Valid: true,
 		}
 	}
+	start := time.Now()
 
 	todo, err := s.querier.UpdateTodo(ctx, params)
+	duration := time.Since(start).Seconds()
+	metrics.RecordDatabaseQuery("update_todo", "todos", duration, err)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("todo not found")
@@ -219,6 +239,8 @@ func (s *TodoService) UpdateTodo(ctx context.Context, todoID uuid.UUID, userID u
 		return nil, fmt.Errorf("failed to update todo: %w", err)
 	}
 
+	// Record business metric
+	metrics.RecordTodoOperation("update")
 	return s.toTodoModel(todo), nil
 }
 
@@ -232,8 +254,10 @@ func (s *TodoService) CompleteTodo(ctx context.Context, todoID uuid.UUID, userID
 	txErr := database.WithTransaction(ctx, s.pool.Pool, database.DefaultTxOptions(), func(tx pgx.Tx) error {
 		txQuerier := db.New(tx)
 
+		start := time.Now()
 		// Lock the row for update
 		todo, err = txQuerier.GetTodoByIDForUpdate(ctx, todoID)
+		metrics.RecordDatabaseQuery("select_for_update", "todos", time.Since(start).Seconds(), err)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				return fmt.Errorf("todo not found")
@@ -251,8 +275,10 @@ func (s *TodoService) CompleteTodo(ctx context.Context, todoID uuid.UUID, userID
 			return fmt.Errorf("todo is already completed")
 		}
 
+		start = time.Now()
 		// Complete the todo
 		todo, err = txQuerier.CompleteTodo(ctx, todoID)
+		metrics.RecordDatabaseQuery("complete_todo", "todos", time.Since(start).Seconds(), err)
 		if err != nil {
 			return fmt.Errorf("failed to complete todo: %w", err)
 		}
@@ -264,6 +290,8 @@ func (s *TodoService) CompleteTodo(ctx context.Context, todoID uuid.UUID, userID
 		return nil, txErr
 	}
 
+	// Record business metric
+	metrics.RecordTodoOperation("complete")
 	return s.toTodoModel(todo), nil
 }
 
@@ -297,10 +325,12 @@ func (s *TodoService) BulkDeleteTodos(ctx context.Context, todoIDs []uuid.UUID, 
 }
 
 func (s *TodoService) DeleteTodo(ctx context.Context, todoID uuid.UUID, userID uuid.UUID) error {
+	start := time.Now()
 	err := s.querier.HardDeleteTodo(ctx, db.HardDeleteTodoParams{
 		ID:     todoID,
 		UserID: userID,
 	})
+	metrics.RecordDatabaseQuery("delete", "todos", time.Since(start).Seconds(), err)
 	if err != nil {
 		return fmt.Errorf("failed to hard delete todo: %w", err)
 	}

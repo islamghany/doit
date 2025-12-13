@@ -26,7 +26,7 @@ scrape_configs:
   # Prometheus itself
   - job_name: "prometheus"
     static_configs:
-      - targets: ["localhost:9090"]
+      - targets: ["api:6060"]
         labels:
           service: "prometheus"
           environment: "development"

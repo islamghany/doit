@@ -15,7 +15,161 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/auth/login": {
+        "/health": {
+            "get": {
+                "description": "Lightweight endpoint that verifies the application process is alive and responsive. This endpoint does NOT check dependencies like database or Redis. Used by Kubernetes/container orchestrators as a liveness probe - if this fails repeatedly, the container will be restarted.\n\n**What it checks:**\n- Web server is responsive\n- Application hasn't crashed or deadlocked\n\n**What it does NOT check:**\n- Database connectivity\n- Redis/cache availability\n- External service availability\n\n**Response time target:** \u003c 10ms",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Health check endpoint (Liveness Probe)",
+                "responses": {
+                    "200": {
+                        "description": "Application is alive and responsive",
+                        "schema": {
+                            "$ref": "#/definitions/api_v1_health_check.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ready": {
+            "get": {
+                "description": "Comprehensive health check that verifies all application dependencies are available and the application is ready to serve traffic. Used by Kubernetes/container orchestrators as a readiness probe - if this fails, the pod is removed from load balancer but NOT restarted.\n\n**What it checks:**\n- Database connectivity and responsiveness (PostgreSQL)\n- Redis/cache availability\n- Disk space availability\n\n**Behavior:**\n- Returns 200 OK when all checks pass\n- Returns 503 Service Unavailable when any check fails\n- Pod stays running but stops receiving traffic until checks pass again\n\n**Response time target:** \u003c 500ms",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Readiness check endpoint (Readiness Probe)",
+                "responses": {
+                    "200": {
+                        "description": "Application is ready to receive traffic - all dependencies are healthy",
+                        "schema": {
+                            "$ref": "#/definitions/api_v1_health_check.ReadinessResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Application is not ready - one or more dependencies are unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/api_v1_health_check.ReadinessResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/todos": {
+            "post": {
+                "description": "Create a new todo with the given title, description, priority, tags, metadata, and due date",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Todo"
+                ],
+                "summary": "Create a new todo",
+                "parameters": [
+                    {
+                        "description": "Todo to create",
+                        "name": "todo",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api_v1_todo.CreateTodoInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Todo created successfully",
+                        "schema": {
+                            "$ref": "#/definitions/doit_internal_model.Todo"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "schema": {
+                            "$ref": "#/definitions/doit_internal_web.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/doit_internal_web.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/doit_internal_web.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/todos/{id}": {
+            "get": {
+                "description": "Get a todo by ID with the given ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Todo"
+                ],
+                "summary": "Get a todo by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Todo ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Todo retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/doit_internal_model.Todo"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "schema": {
+                            "$ref": "#/definitions/doit_internal_web.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/doit_internal_web.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Todo not found",
+                        "schema": {
+                            "$ref": "#/definitions/doit_internal_web.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/doit_internal_web.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/login": {
             "post": {
                 "description": "Authenticate user credentials and receive JWT access token and refresh token. The access token is short-lived (15 minutes) and used for API requests. The refresh token is long-lived (7 days) and used to obtain new access tokens.\nRate limit: 5 requests per minute per IP address",
                 "consumes": [
@@ -73,7 +227,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/logout": {
+        "/v1/auth/logout": {
             "post": {
                 "description": "Revoke the current refresh token, logging out the user from this specific device/session. Other active sessions remain valid.",
                 "consumes": [
@@ -117,7 +271,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/logout/all": {
+        "/v1/auth/logout/all": {
             "post": {
                 "security": [
                     {
@@ -157,7 +311,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/refresh": {
+        "/v1/auth/refresh": {
             "post": {
                 "description": "Exchange a valid refresh token for a new access token and refresh token pair. This implements refresh token rotation for enhanced security - the old refresh token becomes invalid after use.\nSecurity: If an already-used refresh token is detected, all tokens for that user are revoked (possible token theft).",
                 "consumes": [
@@ -207,7 +361,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/register": {
+        "/v1/auth/register": {
             "post": {
                 "description": "Create a new user account with email, username, and password. Passwords must be at least 8 characters and should include uppercase, lowercase, numbers, and special characters. Email and username must be unique.",
                 "consumes": [
@@ -248,52 +402,6 @@ const docTemplate = `{
                         "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/api_v1_auth.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/health": {
-            "get": {
-                "description": "Lightweight endpoint that verifies the application process is alive and responsive. This endpoint does NOT check dependencies like database or Redis. Used by Kubernetes/container orchestrators as a liveness probe - if this fails repeatedly, the container will be restarted.\n\n**What it checks:**\n- Web server is responsive\n- Application hasn't crashed or deadlocked\n\n**What it does NOT check:**\n- Database connectivity\n- Redis/cache availability\n- External service availability\n\n**Response time target:** \u003c 10ms",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Health"
-                ],
-                "summary": "Health check endpoint (Liveness Probe)",
-                "responses": {
-                    "200": {
-                        "description": "Application is alive and responsive",
-                        "schema": {
-                            "$ref": "#/definitions/api_v1_health_check.HealthResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/ready": {
-            "get": {
-                "description": "Comprehensive health check that verifies all application dependencies are available and the application is ready to serve traffic. Used by Kubernetes/container orchestrators as a readiness probe - if this fails, the pod is removed from load balancer but NOT restarted.\n\n**What it checks:**\n- Database connectivity and responsiveness (PostgreSQL)\n- Redis/cache availability\n- Disk space availability\n\n**Behavior:**\n- Returns 200 OK when all checks pass\n- Returns 503 Service Unavailable when any check fails\n- Pod stays running but stops receiving traffic until checks pass again\n\n**Response time target:** \u003c 500ms",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Health"
-                ],
-                "summary": "Readiness check endpoint (Readiness Probe)",
-                "responses": {
-                    "200": {
-                        "description": "Application is ready to receive traffic - all dependencies are healthy",
-                        "schema": {
-                            "$ref": "#/definitions/api_v1_health_check.ReadinessResponse"
-                        }
-                    },
-                    "503": {
-                        "description": "Application is not ready - one or more dependencies are unavailable",
-                        "schema": {
-                            "$ref": "#/definitions/api_v1_health_check.ReadinessResponse"
                         }
                     }
                 }
@@ -538,6 +646,84 @@ const docTemplate = `{
                 }
             }
         },
+        "api_v1_todo.CreateTodoInput": {
+            "type": "object"
+        },
+        "doit_internal_model.Todo": {
+            "type": "object",
+            "properties": {
+                "completed_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "due_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "priority": {
+                    "$ref": "#/definitions/doit_internal_model.TodoPriority"
+                },
+                "status": {
+                    "$ref": "#/definitions/doit_internal_model.TodoStatus"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "doit_internal_model.TodoPriority": {
+            "type": "string",
+            "enum": [
+                "low",
+                "medium",
+                "high",
+                "urgent"
+            ],
+            "x-enum-varnames": [
+                "TodoPriorityLow",
+                "TodoPriorityMedium",
+                "TodoPriorityHigh",
+                "TodoPriorityUrgent"
+            ]
+        },
+        "doit_internal_model.TodoStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "in_progress",
+                "completed",
+                "archived"
+            ],
+            "x-enum-varnames": [
+                "TodoStatusPending",
+                "TodoStatusInProgress",
+                "TodoStatusCompleted",
+                "TodoStatusArchived"
+            ]
+        },
         "doit_internal_model.TokenPair": {
             "type": "object",
             "properties": {
@@ -647,6 +833,15 @@ const docTemplate = `{
                 "UserRoleAdmin",
                 "UserRoleModerator"
             ]
+        },
+        "doit_internal_web.Error": {
+            "type": "object",
+            "properties": {
+                "err": {},
+                "status": {
+                    "type": "integer"
+                }
+            }
         }
     }
 }`
