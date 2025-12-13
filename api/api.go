@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -69,7 +68,7 @@ func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
 		return fmt.Errorf("failed to create server: %w", err)
 	}
 
-	server := &http.Server{
+	mainServer := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
 		Handler:      srv,
 		ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
@@ -77,26 +76,29 @@ func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
 		IdleTimeout:  time.Duration(cfg.Server.IdleTimeout) * time.Second,
 	}
 
-	shutdownError := make(chan error)
+	// Create debug server (bind to localhost for security)
+	expvar.NewString("version").Set(cfg.App.Version)
+	expvar.NewString("environment").Set(string(cfg.App.Environment))
+
+	debugServer := &http.Server{
+		Addr:    fmt.Sprintf("127.0.0.1:%d", cfg.Server.DebugPort),
+		Handler: debug.Mux(),
+	}
+	// Channel to collect server errors
+	serverErrors := make(chan error, 2)
 
 	go func() {
-		logger.Info(ctx, "Starting the HTTP server on", "address", server.Addr)
-		shutdownError <- server.ListenAndServe()
+		logger.Info(ctx, "Starting the HTTP server", "address", mainServer.Addr)
+		if err := mainServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErrors <- fmt.Errorf("main server error: %w", err)
+		}
 	}()
 
-	// Starting the debug server
-	w := sync.WaitGroup{}
-	w.Add(1)
+	// Start debug server
 	go func() {
-		defer w.Done()
-
-		expvar.NewString("version").Set(cfg.App.Version)
-		expvar.NewString("environment").Set(string(cfg.App.Environment))
-
-		logger.Info(ctx, "Starting the debug server on", "address", fmt.Sprintf(":%d", cfg.Server.DebugPort))
-
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.Server.DebugPort), debug.Mux()); err != nil {
-			logger.Error(ctx, "shutdown", "status", "debug v1 router cloased", "host", cfg.Server.DebugPort)
+		logger.Info(ctx, "Starting the debug server", "address", debugServer.Addr)
+		if err := debugServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErrors <- fmt.Errorf("debug server error: %w", err)
 		}
 	}()
 
@@ -104,7 +106,7 @@ func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
 	signal.Notify(shutdownChan, syscall.SIGINT, syscall.SIGTERM)
 
 	select {
-	case err := <-shutdownError:
+	case err := <-serverErrors:
 		// Server failed to start
 		if err != nil && err != http.ErrServerClosed {
 			return fmt.Errorf("error starting the server: %w", err)
@@ -118,14 +120,34 @@ func Run(ctx context.Context, logger *logger.Logger, cfg *config.Config) error {
 			// 25 is reasonable time to wait for the server to shutdown
 			// since kubernetes will wait for 30 seconds before killing the pod
 			// and we need to give the server enough time to shutdown
-			ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 			defer cancel()
 
-			if err := server.Shutdown(ctx); err != nil {
-				server.Close()
-				return fmt.Errorf("error shutting down the server gracefully: %w", err)
+			// Shutdown both servers concurrently
+			errChan := make(chan error, 2)
+
+			go func() {
+				errChan <- mainServer.Shutdown(shutdownCtx)
+			}()
+
+			go func() {
+				errChan <- debugServer.Shutdown(shutdownCtx)
+			}()
+
+			// Wait for both to complete
+			var shutdownErr error
+			for i := 0; i < 2; i++ {
+				if err := <-errChan; err != nil {
+					shutdownErr = err
+					logger.Error(ctx, "Error during shutdown", "error", err)
+				}
 			}
-			logger.Info(ctx, "Server stopped gracefully")
+
+			if shutdownErr != nil {
+				return fmt.Errorf("error shutting down servers: %w", shutdownErr)
+			}
+
+			logger.Info(ctx, "All servers stopped gracefully")
 			return nil
 		}
 	}

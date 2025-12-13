@@ -16,7 +16,7 @@ func PanicMiddleware() web.MiddleWare {
 				if recErr := recover(); recErr != nil {
 					trace := debug.Stack()
 					err = fmt.Errorf("panic [%v] trace[%s]", recErr, trace)
-					metrics.AddPanics(r.Context())
+					metrics.AddPanics()
 				}
 			}()
 			return handler(w, r)
