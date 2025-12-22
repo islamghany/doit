@@ -157,6 +157,12 @@ services:
       - "--web.console.templates=/usr/share/prometheus/consoles"
       - "--web.enable-lifecycle"
       - "--storage.tsdb.retention.time=30d"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - doit_network
     restart: unless-stopped
@@ -170,7 +176,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
     environment:
       # Admin credentials
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
@@ -186,10 +193,23 @@ services:
       # Server
       GF_SERVER_ROOT_URL: http://localhost:3000
       GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      
+      # Dashboard settings
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/api-overview.json
+      
+      # Logging
+      GF_LOG_MODE: console
+      GF_LOG_LEVEL: info
     volumes:
       - grafana_data:/var/lib/grafana
       - ./infra/docker/grafana/provisioning:/etc/grafana/provisioning
       - ./infra/docker/grafana/dashboards:/var/lib/grafana/dashboards
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - doit_network
     restart: unless-stopped

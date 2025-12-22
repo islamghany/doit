@@ -314,29 +314,28 @@ make compose-down-v    # Stop and remove volumes
 
 **Metrics to Add:**
 
-- [ ] HTTP request duration (histogram)
-- [ ] Request count by method/path/status (counter)
-- [ ] Active database connections (gauge)
-- [ ] Database query duration (histogram)
-- [ ] Todo operations count (create/update/delete/read)
-- [ ] Cache hit/miss ratio (counter)
-- [ ] Active goroutines (gauge)
-- [ ] Memory usage (gauge)
+- [x] HTTP request duration (histogram)
+- [x] Request count by method/path/status (counter)
+- [x] Active database connections (gauge)
+- [x] Database query duration (histogram)
+- [x] Todo operations count (create/update/delete/read)
+- [x] Cache hit/miss ratio (counter)
+- [x] Active goroutines (gauge)
+- [x] Memory usage (gauge)
 
 **Implementation Tasks:**
 
-- [ ] Add `prometheus/client_golang` dependency
-- [ ] Create metrics middleware
-- [ ] Expose `/metrics` endpoint
-- [ ] Instrument all HTTP handlers
-- [ ] Instrument database queries
-- [ ] Add custom business metrics
-- [ ] Configure Prometheus scraping
-- [ ] Create Grafana dashboards
-  - [ ] Request rate and latency
-  - [ ] Error rate
-  - [ ] Database performance
-  - [ ] Cache performance
+- [x] Add `prometheus/client_golang` dependency
+- [x] Create metrics middleware
+- [x] Expose `/metrics` endpoint
+- [x] Instrument all HTTP handlers
+- [x] Instrument database queries
+- [x] Add custom business metrics
+- [x] Configure Prometheus scraping
+- [x] Create Grafana dashboards
+  - [x] Request rate and latency
+  - [x] Error rate
+  - [x] Database performance
 
 **Deliverable:** Beautiful Grafana dashboards showing real-time metrics
 
