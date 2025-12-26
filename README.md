@@ -12,7 +12,10 @@
 - [x] Phase 2: Local Infrastructure & Containerization (Weeks 2-3) ✅ **Completed**
   - [x] 2.1: Docker Multi-Stage Build ✅
   - [x] 2.2: Docker Compose - Full Local Stack ✅
-- [ ] Phase 3: Observability & Monitoring (Weeks 3-4)
+- [x] Phase 3: Observability & Monitoring (Weeks 3-4) ✅ **Completed**
+  - [x] 3.1: Structured Logging with Context ✅
+  - [x] 3.2: Metrics with Prometheus ✅
+  - [x] 3.3: Distributed Tracing (OpenTelemetry + Jaeger) ✅
 - [ ] Phase 4: Architecture Patterns & Caching (Weeks 4-5)
 - [ ] Phase 5: Kubernetes & Helm (Weeks 5-7)
 - [ ] Phase 6: AWS Deployment Foundation (Weeks 7-9)
@@ -274,10 +277,18 @@ make compose-down-v    # Stop and remove volumes
 
 ---
 
-## Phase 3: Observability & Monitoring
+## Phase 3: Observability & Monitoring ✅ **COMPLETED**
 
 **Duration:** Weeks 3-4  
 **Theme:** Make your application observable and debuggable
+
+**What you achieved:**
+
+- Full observability stack with the three pillars: Logs, Metrics, Traces
+- Prometheus for metrics collection and alerting
+- Grafana as single pane of glass (metrics + traces)
+- Jaeger for distributed tracing via OpenTelemetry
+- Hybrid development workflow (local Go + Docker infrastructure)
 
 ### 3.1 Structured Logging with Context
 
@@ -341,31 +352,95 @@ make compose-down-v    # Stop and remove volumes
 
 ---
 
-### 3.3 Distributed Tracing (OpenTelemetry)
+### 3.3 Distributed Tracing (OpenTelemetry) ✅ **COMPLETED**
 
-**What you'll learn:**
+**What you learned:**
 
-- Trace context propagation
-- Span creation and relationships (parent/child)
+- Trace context propagation (W3C Trace Context standard)
+- Span creation and relationships (parent/child spans)
 - Performance bottleneck identification
 - Distributed systems debugging
+- OpenTelemetry SDK architecture (Provider, Exporter, Propagator)
+- OTLP protocol for trace export
+- Sampling strategies (development vs production)
 
-**Implementation Tasks:**
+**Implementation Completed:**
 
-- [ ] Add OpenTelemetry SDK
-- [ ] Configure Jaeger exporter
-- [ ] Add tracing middleware
-- [ ] Instrument HTTP handlers (spans)
-- [ ] Instrument database operations
-- [ ] Instrument Redis operations
-- [ ] Add custom spans for business logic
-- [ ] Propagate trace context across services
-- [ ] Test trace visualization in Jaeger UI
-- [ ] Add span attributes (user ID, todo ID, etc.)
+- [x] Add OpenTelemetry SDK (`go.opentelemetry.io/otel`)
+- [x] Configure OTLP exporter to Jaeger
+- [x] Add tracing middleware (creates root HTTP spans)
+- [x] Instrument HTTP handlers (automatic via middleware)
+- [x] Instrument database operations (all SQLC queries)
+- [x] Instrument Redis/cache operations (all cache methods)
+- [x] Add service layer tracing (TodoService, UserService, TokenService)
+- [x] Propagate trace context across services (W3C headers)
+- [x] Test trace visualization in Jaeger UI
+- [x] Add span attributes (user ID, todo ID, operation type, etc.)
+- [x] Integrate Jaeger datasource in Grafana
+- [x] Create hybrid development setup (local Go + Docker infrastructure)
 
-**Why this matters:** AWS X-Ray uses similar concepts. OpenTelemetry is vendor-neutral and industry standard.
+**Files Created/Modified:**
+
+- `internal/tracing/tracing.go` - OpenTelemetry provider initialization
+- `internal/tracing/helpers.go` - Tracing helper functions (StartDBSpan, StartCacheSpan, etc.)
+- `internal/middlewares/tracing_middleware.go` - HTTP tracing middleware
+- `internal/service/todo_service.go` - Service layer tracing
+- `internal/service/user_service.go` - User service tracing
+- `internal/service/token_service.go` - Token/auth service tracing
+- `internal/cache/redis.go` - Cache operation tracing
+- `internal/config/config.go` - Tracing configuration
+- `docker-compose.yml` - Jaeger service added
+- `docker-compose.infra.yml` - Infrastructure-only compose for hybrid dev
+- `infra/docker/grafana/provisioning-dev/datasources/prometheus.yaml` - Jaeger + Prometheus datasources
+
+**Documentation Created:**
+
+- 📖 [Prometheus Mental Model](docs/observability/PROMETHEUS_MENTAL_MODEL.md) - Metrics concepts
+- 📖 [Grafana Mental Model](docs/observability/GRAFANA_MENTAL_MODEL.md) - Visualization concepts
+- 📖 [Distributed Tracing Mental Model](docs/observability/DISTRIBUTED_TRACING_MENTAL_MODEL.md) - Tracing concepts
+- 📖 [Observability Overview](docs/observability/OBSERVABILITY_OVERVIEW.md) - Three pillars summary
+
+**Service URLs:**
+
+- 🔹 Jaeger UI: http://localhost:16686
+- 🔹 Grafana (with Jaeger): http://localhost:3000 (Explore → Jaeger)
+- 🔹 Prometheus: http://localhost:9090
+
+**Quick Start (Hybrid Development):**
+
+```bash
+# Start infrastructure only (DB, Redis, Jaeger, Prometheus, Grafana)
+make dev-infra
+
+# Run migrations
+make dev-migrate
+
+# Run Go API locally (connects to Docker infrastructure)
+make dev-run
+
+# View traces in Jaeger
+open http://localhost:16686
+
+# View traces in Grafana
+open http://localhost:3000  # Explore → Select Jaeger
+```
+
+**Trace Structure Example:**
+
+```
+HTTP POST /api/v1/todos (250ms)
+├── TodoService.CreateTodo (200ms)
+│   ├── cache.GET (5ms) - cache miss
+│   ├── db.INSERT (150ms) - todos table
+│   └── cache.SET (10ms) - cache update
+└── Response sent
+```
+
+**Why this matters:** AWS X-Ray uses similar concepts. OpenTelemetry is vendor-neutral and industry standard. Skills transfer directly to any cloud provider.
 
 **Architecture Pattern:** Observability through instrumentation
+
+**Deliverable:** ✅ Full distributed tracing with Jaeger, integrated into Grafana as single pane of glass
 
 ---
 
@@ -2644,6 +2719,29 @@ Worker: Process async (send email, update analytics)
 - [Phase 2 Completion Summary](PHASE_2_COMPLETION_SUMMARY.md) - Overall results
 - [Kubernetes Roadmap](KUBERNETES_ROADMAP_SUMMARY.md) - Future Kubernetes plans
 
+### Phase 3: Observability & Monitoring
+
+**Mental Model Guides:**
+
+- [Prometheus Mental Model](docs/observability/PROMETHEUS_MENTAL_MODEL.md) - Metrics concepts & PromQL
+- [Grafana Mental Model](docs/observability/GRAFANA_MENTAL_MODEL.md) - Dashboards & visualization
+- [Distributed Tracing Mental Model](docs/observability/DISTRIBUTED_TRACING_MENTAL_MODEL.md) - OpenTelemetry & Jaeger
+- [Observability Overview](docs/observability/OBSERVABILITY_OVERVIEW.md) - Three pillars summary
+
+**Implementation Files:**
+
+- `internal/tracing/tracing.go` - OpenTelemetry provider setup
+- `internal/tracing/helpers.go` - Tracing helper functions
+- `internal/middlewares/tracing_middleware.go` - HTTP tracing middleware
+- `infra/docker/grafana/provisioning-dev/datasources/prometheus.yaml` - Grafana datasources (Prometheus + Jaeger)
+- `infra/docker/grafana/dashboards/api-overview.json` - API metrics dashboard
+- `infra/docker/grafana/dashboards/database-performance.json` - Database metrics dashboard
+
+**Development Workflow:**
+
+- `docker-compose.infra.yml` - Infrastructure-only compose for hybrid development
+- `env.local.example` - Local environment variables template
+
 ### Database & Migrations
 
 - [Migration Guide](internal/data/docs/MIGRATION_GUIDE.md) - Database migrations
@@ -2816,6 +2914,6 @@ Good luck on your learning journey! 🎓
 
 ---
 
-**Last Updated:** November 22, 2025  
+**Last Updated:** December 26, 2025  
 **Project:** doit (Go REST API with PostgreSQL)  
-**Focus:** Backend Architecture • DevOps • AWS • Containerization
+**Focus:** Backend Architecture • DevOps • AWS • Containerization • Observability
