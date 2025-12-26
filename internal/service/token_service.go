@@ -12,6 +12,7 @@ import (
 	"doit/internal/data/db"
 	"doit/internal/model"
 	"doit/internal/token"
+	"doit/internal/tracing"
 	"doit/pkg/database"
 
 	"github.com/google/uuid"
@@ -50,7 +51,16 @@ func NewTokenService(
 
 // CreateTokenPair creates both access and refresh tokens for a user
 func (s *TokenService) CreateTokenPair(ctx context.Context, user model.User, deviceInfo model.DeviceInfo) (*model.TokenPair, error) {
+	ctx, span := tracing.StartServiceSpan(ctx, "TokenService", "CreateTokenPair")
+	defer span.End()
+
+	tracing.SetAttributes(span,
+		tracing.String("user.id", user.ID.String()),
+		tracing.String("user.email", user.Email),
+	)
+
 	// 1. Create short-lived access token (stateless)
+	tracing.AddEvent(span, "creating_access_token")
 	accessToken, _, err := s.tokenMaker.CreateToken(token.TokenParams{
 		UserID:   user.ID,
 		Email:    user.Email,
@@ -60,10 +70,12 @@ func (s *TokenService) CreateTokenPair(ctx context.Context, user model.User, dev
 		Duration: time.Duration(s.accessTokenDuration) * time.Second,
 	})
 	if err != nil {
+		tracing.RecordError(span, err)
 		return nil, fmt.Errorf("failed to create access token: %w", err)
 	}
 
 	// 2. Create long-lived refresh token (stateful)
+	tracing.AddEvent(span, "creating_refresh_token")
 	refreshTokenString, refreshPayload, err := s.tokenMaker.CreateToken(token.TokenParams{
 		UserID:   user.ID,
 		Email:    user.Email,
@@ -73,6 +85,7 @@ func (s *TokenService) CreateTokenPair(ctx context.Context, user model.User, dev
 		Duration: time.Duration(s.refreshTokenDuration) * time.Second,
 	})
 	if err != nil {
+		tracing.RecordError(span, err)
 		return nil, fmt.Errorf("failed to create refresh token: %w", err)
 	}
 
@@ -82,11 +95,13 @@ func (s *TokenService) CreateTokenPair(ctx context.Context, user model.User, dev
 	// 4. Prepare device info as JSON
 	deviceJSON, err := json.Marshal(deviceInfo)
 	if err != nil {
+		tracing.RecordError(span, err)
 		return nil, fmt.Errorf("marshal device info: %w", err)
 	}
 
 	// 5. Store refresh token in database
-	_, err = s.querier.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
+	dbCtx, dbSpan := tracing.StartDBSpan(ctx, "INSERT", "refresh_tokens")
+	_, err = s.querier.CreateRefreshToken(dbCtx, db.CreateRefreshTokenParams{
 		ID:        refreshPayload.ID,
 		UserID:    user.ID,
 		TokenHash: tokenHash,
@@ -96,10 +111,15 @@ func (s *TokenService) CreateTokenPair(ctx context.Context, user model.User, dev
 		},
 		DeviceInfo: deviceJSON,
 	})
+	dbSpan.End()
+
 	if err != nil {
+		tracing.RecordError(span, err)
 		return nil, fmt.Errorf("store refresh token: %w", err)
 	}
 
+	tracing.AddEvent(span, "token_pair_created")
+	tracing.SetOK(span)
 	return &model.TokenPair{
 		AccessToken:  accessToken,
 		RefreshToken: refreshTokenString,
@@ -111,46 +131,89 @@ func (s *TokenService) CreateTokenPair(ctx context.Context, user model.User, dev
 // VerifyAccessToken verifies an access token and returns the payload
 // This is fast - only checks JWT signature + version (no DB lookup of token itself)
 func (s *TokenService) VerifyAccessToken(ctx context.Context, tokenString string) (*token.Payload, error) {
+	ctx, span := tracing.StartServiceSpan(ctx, "TokenService", "VerifyAccessToken")
+	defer span.End()
+
 	// 1. Verify JWT signature and expiration
+	tracing.AddEvent(span, "verifying_jwt_signature")
 	payload, err := s.tokenMaker.VerifyToken(tokenString)
 	if err != nil {
+		tracing.AddEvent(span, "jwt_verification_failed", tracing.String("error", err.Error()))
+		tracing.RecordError(span, err)
 		return nil, err
 	}
 
+	tracing.SetAttributes(span,
+		tracing.String("user.id", payload.UserID.String()),
+		tracing.String("token.id", payload.ID.String()),
+	)
+
 	// 2. Check token version (handles password changes, security events)
-	currentVersion, err := s.querier.GetUserTokenVersion(ctx, payload.UserID)
+	dbCtx, dbSpan := tracing.StartDBSpan(ctx, "SELECT", "users")
+	tracing.SetAttributes(dbSpan, tracing.String("db.query_type", "get_token_version"))
+	currentVersion, err := s.querier.GetUserTokenVersion(dbCtx, payload.UserID)
+	dbSpan.End()
+
 	if err != nil {
+		tracing.RecordError(span, err)
 		return nil, fmt.Errorf("get token version: %w", err)
 	}
 
 	// 3. Version mismatch = token invalidated (password changed, security event)
 	if payload.Version != int(*currentVersion) {
+		tracing.AddEvent(span, "token_version_mismatch",
+			tracing.Int("token.version", payload.Version),
+			tracing.Int("current.version", int(*currentVersion)),
+		)
 		return nil, token.ErrInvalidToken
 	}
 
+	tracing.AddEvent(span, "token_verified")
+	tracing.SetOK(span)
 	return payload, nil
 }
 
 // RefreshAccessToken exchanges a refresh token for a new access token
 func (s *TokenService) RefreshAccessToken(ctx context.Context, refreshTokenString string) (*model.TokenPair, error) {
+	ctx, span := tracing.StartServiceSpan(ctx, "TokenService", "RefreshAccessToken")
+	defer span.End()
+
 	// 1. Verify refresh token JWT signature and expiration
+	tracing.AddEvent(span, "verifying_refresh_token")
 	payload, err := s.tokenMaker.VerifyToken(refreshTokenString)
 	if err != nil {
+		tracing.AddEvent(span, "refresh_token_invalid")
+		tracing.RecordError(span, err)
 		return nil, token.ErrInvalidToken
 	}
+
+	tracing.SetAttributes(span,
+		tracing.String("user.id", payload.UserID.String()),
+		tracing.String("token.id", payload.ID.String()),
+	)
 
 	// 2. Hash the token to lookup in database
 	tokenHash := hashToken(refreshTokenString)
 
 	// 3. Get refresh token from database (including revoked ones for security check)
-	storedToken, err := s.querier.GetRefreshTokenIncludingRevoked(ctx, tokenHash)
+	dbCtx, dbSpan := tracing.StartDBSpan(ctx, "SELECT", "refresh_tokens")
+	storedToken, err := s.querier.GetRefreshTokenIncludingRevoked(dbCtx, tokenHash)
+	dbSpan.End()
+
 	if err != nil {
+		tracing.AddEvent(span, "refresh_token_not_found")
+		tracing.RecordError(span, err)
 		return nil, fmt.Errorf("refresh token not found: %w", err)
 	}
+
 	// 4. SECURITY CHECK: Detect token reuse (revoked token being used)
 	if storedToken.IsRevoked {
 		// 🚨 CRITICAL SECURITY EVENT!
-		// Someone is trying to use a revoked token - possible theft/replay attack
+		tracing.AddEvent(span, "security_alert_revoked_token_reuse",
+			tracing.String("user.id", storedToken.UserID.String()),
+			tracing.String("token.id", storedToken.ID.String()),
+		)
+
 		// Log the security incident
 		fmt.Printf("🚨 SECURITY ALERT: Revoked token reuse detected!\n")
 		fmt.Printf("   User ID: %s\n", storedToken.UserID)
@@ -159,26 +222,34 @@ func (s *TokenService) RefreshAccessToken(ctx context.Context, refreshTokenStrin
 		fmt.Printf("   Time Since Revoke: %s\n", time.Since(storedToken.LastUsedAt.Time))
 
 		// Security Response: Revoke ALL user tokens immediately
-		err = s.RevokeAllUserTokens(ctx, storedToken.UserID)
-		if err != nil {
-			fmt.Printf("Failed to revoke all tokens: %v\n", err)
+		revokeErr := s.RevokeAllUserTokens(ctx, storedToken.UserID)
+		if revokeErr != nil {
+			tracing.AddEvent(span, "failed_to_revoke_all_tokens", tracing.String("error", revokeErr.Error()))
+			fmt.Printf("Failed to revoke all tokens: %v\n", revokeErr)
 		}
 
-		// TODO: Send security alert email/notification to user
-		// s.notificationService.SendSecurityAlert(storedToken.UserID, ...)
-
+		tracing.RecordError(span, ErrSecurityAlert)
 		return nil, ErrSecurityAlert
 	}
+
 	// 5. Check if token is expired
 	if time.Now().After(storedToken.ExpiresAt.Time) {
+		tracing.AddEvent(span, "refresh_token_expired")
 		return nil, token.ErrExpiredToken
 	}
+
 	// 6. Update last used timestamp (for session tracking)
-	_ = s.querier.UpdateRefreshTokenUsage(ctx, storedToken.ID)
+	updateCtx, updateSpan := tracing.StartDBSpan(ctx, "UPDATE", "refresh_tokens")
+	_ = s.querier.UpdateRefreshTokenUsage(updateCtx, storedToken.ID)
+	updateSpan.End()
 
 	// 7. Get current user data (fresh from DB)
-	user, err := s.querier.GetUserByID(ctx, payload.UserID)
+	userCtx, userSpan := tracing.StartDBSpan(ctx, "SELECT", "users")
+	user, err := s.querier.GetUserByID(userCtx, payload.UserID)
+	userSpan.End()
+
 	if err != nil {
+		tracing.RecordError(span, err)
 		return nil, fmt.Errorf("get user: %w", err)
 	}
 
@@ -189,6 +260,7 @@ func (s *TokenService) RefreshAccessToken(ctx context.Context, refreshTokenStrin
 	// }
 
 	// 9. Create new access token with current user data and version
+	tracing.AddEvent(span, "creating_new_access_token")
 	accessToken, _, err := s.tokenMaker.CreateToken(token.TokenParams{
 		UserID:   user.ID,
 		Email:    user.Email,
@@ -198,8 +270,12 @@ func (s *TokenService) RefreshAccessToken(ctx context.Context, refreshTokenStrin
 		Duration: 15 * time.Minute,
 	})
 	if err != nil {
+		tracing.RecordError(span, err)
 		return nil, fmt.Errorf("create access token: %w", err)
 	}
+
+	tracing.AddEvent(span, "access_token_refreshed")
+	tracing.SetOK(span)
 	return &model.TokenPair{
 		AccessToken:  accessToken,
 		RefreshToken: refreshTokenString,
@@ -216,32 +292,79 @@ func hashToken(token string) string {
 
 // Logout revokes a specific refresh token (single device logout)
 func (s *TokenService) Logout(ctx context.Context, refreshTokenString string) error {
+	ctx, span := tracing.StartServiceSpan(ctx, "TokenService", "Logout")
+	defer span.End()
+
 	tokenHash := hashToken(refreshTokenString)
-	return s.querier.RevokeRefreshToken(ctx, tokenHash)
+
+	dbCtx, dbSpan := tracing.StartDBSpan(ctx, "UPDATE", "refresh_tokens")
+	tracing.SetAttributes(dbSpan, tracing.String("db.query_type", "revoke_token"))
+	err := s.querier.RevokeRefreshToken(dbCtx, tokenHash)
+	dbSpan.End()
+
+	if err != nil {
+		tracing.RecordError(span, err)
+		return err
+	}
+
+	tracing.AddEvent(span, "user_logged_out")
+	tracing.SetOK(span)
+	return nil
 }
 
 // RevokeAllUserTokens revokes all tokens for a user (logout all devices)
 // Use when: password change, security breach, admin action
 func (s *TokenService) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID) error {
+	ctx, span := tracing.StartServiceSpan(ctx, "TokenService", "RevokeAllUserTokens")
+	defer span.End()
+
+	tracing.SetAttributes(span, tracing.String("user.id", userID.String()))
+	tracing.AddEvent(span, "revoking_all_user_tokens")
+
 	// 1. Increment token version (invalidates ALL access tokens immediately)
-	_, err := s.querier.IncrementUserTokenVersion(ctx, userID)
+	versionCtx, versionSpan := tracing.StartDBSpan(ctx, "UPDATE", "users")
+	tracing.SetAttributes(versionSpan, tracing.String("db.query_type", "increment_token_version"))
+	_, err := s.querier.IncrementUserTokenVersion(versionCtx, userID)
+	versionSpan.End()
+
 	if err != nil {
+		tracing.RecordError(span, err)
 		return fmt.Errorf("increment token version: %w", err)
 	}
 
 	// 2. Revoke all refresh tokens (logout all devices)
-	err = s.querier.RevokeAllUserRefreshTokens(ctx, userID)
+	revokeCtx, revokeSpan := tracing.StartDBSpan(ctx, "UPDATE", "refresh_tokens")
+	tracing.SetAttributes(revokeSpan, tracing.String("db.query_type", "revoke_all_tokens"))
+	err = s.querier.RevokeAllUserRefreshTokens(revokeCtx, userID)
+	revokeSpan.End()
+
 	if err != nil {
+		tracing.RecordError(span, err)
 		return fmt.Errorf("revoke all refresh tokens: %w", err)
 	}
 
+	tracing.AddEvent(span, "all_tokens_revoked")
+	tracing.SetOK(span)
 	return nil
 }
 
 // GetUserSessions returns all active sessions for a user
 func (s *TokenService) GetUserSessions(ctx context.Context, userID uuid.UUID, currentTokenID uuid.UUID) ([]model.Session, error) {
-	tokens, err := s.querier.GetUserActiveRefreshTokens(ctx, userID)
+	ctx, span := tracing.StartServiceSpan(ctx, "TokenService", "GetUserSessions")
+	defer span.End()
+
+	tracing.SetAttributes(span,
+		tracing.String("user.id", userID.String()),
+		tracing.String("current_token.id", currentTokenID.String()),
+	)
+
+	dbCtx, dbSpan := tracing.StartDBSpan(ctx, "SELECT", "refresh_tokens")
+	tracing.SetAttributes(dbSpan, tracing.String("db.query_type", "get_active_tokens"))
+	tokens, err := s.querier.GetUserActiveRefreshTokens(dbCtx, userID)
+	dbSpan.End()
+
 	if err != nil {
+		tracing.RecordError(span, err)
 		return nil, fmt.Errorf("get active tokens: %w", err)
 	}
 
@@ -261,5 +384,7 @@ func (s *TokenService) GetUserSessions(ctx context.Context, userID uuid.UUID, cu
 		}
 	}
 
+	tracing.SetAttributes(span, tracing.Int("session.count", len(sessions)))
+	tracing.SetOK(span)
 	return sessions, nil
 }

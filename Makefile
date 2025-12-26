@@ -586,22 +586,22 @@ dev-infra-ps:
 .PHONY: dev-migrate
 dev-migrate:
 	@echo "🗄️  Running migrations..."
-	migrate -path internal/data/migrations -database "postgresql://doit:doit123@localhost:5432/doit?sslmode=disable" up
+	migrate -path internal/data/migrations -database "postgresql://islamghany:secret@localhost:5432/doit?sslmode=disable" up
 	@echo "✅ Migrations complete!"
 
 ## dev-migrate-down: Rollback migrations
 .PHONY: dev-migrate-down
 dev-migrate-down:
 	@echo "🗄️  Rolling back migrations..."
-	migrate -path internal/data/migrations -database "postgresql://doit:doit123@localhost:5432/doit?sslmode=disable" down 1
+	migrate -path internal/data/migrations -database "postgresql://islamghany:secret@localhost:5432/doit?sslmode=disable" down 1
 	@echo "✅ Rollback complete!"
 
 ## dev-migrate-reset: Reset all migrations (⚠️  deletes all data!)
 .PHONY: dev-migrate-reset
 dev-migrate-reset:
 	@echo "⚠️  Resetting all migrations..."
-	migrate -path internal/data/migrations -database "postgresql://doit:doit123@localhost:5432/doit?sslmode=disable" drop -f
-	migrate -path internal/data/migrations -database "postgresql://doit:doit123@localhost:5432/doit?sslmode=disable" up
+	migrate -path internal/data/migrations -database "postgresql://islamghany:secret@localhost:5432/doit?sslmode=disable" drop -f
+	migrate -path internal/data/migrations -database "postgresql://islamghany:secret@localhost:5432/doit?sslmode=disable" up
 	@echo "✅ Migrations reset!"
 
 ## dev-run: Run Go API locally (connects to Docker infrastructure)

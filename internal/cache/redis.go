@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"doit/internal/metrics"
+	"doit/internal/tracing"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -116,22 +117,33 @@ func (c *RedisCache) Set(ctx context.Context, key string, value any) error {
 
 // Get retrieves a value from Redis
 func (c *RedisCache) Get(ctx context.Context, key string) (any, error) {
+	// Start cache span
+	ctx, span := tracing.StartCacheSpan(ctx, "get", key)
+	defer span.End()
+
 	if err := validateKey(key); err != nil {
+		tracing.RecordError(span, err)
 		return nil, err
 	}
+
 	data, err := c.client.Get(ctx, key).Bytes()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
+			tracing.CacheMiss(span)
 			metrics.RecordCacheOperation("get", "redis", false) // miss
 			return nil, ErrCacheMiss
 		}
+		tracing.RecordError(span, err)
 		return nil, fmt.Errorf("%w: %v", ErrConnection, err)
 	}
 
+	tracing.CacheHit(span)
 	metrics.RecordCacheOperation("get", "redis", true) // hit
+
 	// Deserialize
 	var result any
 	if err := c.serializer.Unmarshal(data, &result); err != nil {
+		tracing.RecordError(span, err)
 		return nil, err
 	}
 
@@ -140,11 +152,17 @@ func (c *RedisCache) Get(ctx context.Context, key string) (any, error) {
 
 // Delete removes a value from Redis
 func (c *RedisCache) Delete(ctx context.Context, key string) error {
+	// Start cache span
+	ctx, span := tracing.StartCacheSpan(ctx, "delete", key)
+	defer span.End()
+
 	if err := validateKey(key); err != nil {
+		tracing.RecordError(span, err)
 		return err
 	}
 
 	if err := c.client.Del(ctx, key).Err(); err != nil {
+		tracing.RecordError(span, err)
 		return fmt.Errorf("%w: %v", ErrConnection, err)
 	}
 
@@ -153,32 +171,48 @@ func (c *RedisCache) Delete(ctx context.Context, key string) error {
 
 // Exists checks if a key exists in Redis
 func (c *RedisCache) Exists(ctx context.Context, key string) (bool, error) {
+	// Start cache span
+	ctx, span := tracing.StartCacheSpan(ctx, "exists", key)
+	defer span.End()
+
 	if err := validateKey(key); err != nil {
+		tracing.RecordError(span, err)
 		return false, err
 	}
 
 	count, err := c.client.Exists(ctx, key).Result()
 	if err != nil {
+		tracing.RecordError(span, err)
 		return false, fmt.Errorf("%w: %v", ErrConnection, err)
 	}
 
-	return count > 0, nil
+	exists := count > 0
+	tracing.SetAttributes(span, tracing.Bool("cache.exists", exists))
+	return exists, nil
 }
 
 // SetWithTTL stores a value in Redis with specific TTL
 func (c *RedisCache) SetWithTTL(ctx context.Context, key string, value any, ttl time.Duration) error {
+	// Start cache span
+	ctx, span := tracing.StartCacheSpan(ctx, "set", key)
+	defer span.End()
+	tracing.SetAttributes(span, tracing.Int64("cache.ttl_seconds", int64(ttl.Seconds())))
+
 	if err := validateKey(key); err != nil {
+		tracing.RecordError(span, err)
 		return err
 	}
 
 	// Serialize value
 	data, err := c.serializer.Marshal(value)
 	if err != nil {
+		tracing.RecordError(span, err)
 		return err
 	}
 
 	// Set with TTL
 	if err := c.client.Set(ctx, key, data, ttl).Err(); err != nil {
+		tracing.RecordError(span, err)
 		return fmt.Errorf("%w: %v", ErrConnection, err)
 	}
 
@@ -229,43 +263,65 @@ func (c *RedisCache) Expire(ctx context.Context, key string, ttl time.Duration) 
 
 // Increment increments a numeric value in Redis
 func (c *RedisCache) Increment(ctx context.Context, key string) (int64, error) {
+	// Start cache span
+	ctx, span := tracing.StartCacheSpan(ctx, "incr", key)
+	defer span.End()
+
 	if err := validateKey(key); err != nil {
+		tracing.RecordError(span, err)
 		return 0, err
 	}
 
 	val, err := c.client.Incr(ctx, key).Result()
 	if err != nil {
+		tracing.RecordError(span, err)
 		return 0, fmt.Errorf("%w: %v", ErrConnection, err)
 	}
 
+	tracing.SetAttributes(span, tracing.Int64("cache.value", val))
 	return val, nil
 }
 
 // Decrement decrements a numeric value in Redis
 func (c *RedisCache) Decrement(ctx context.Context, key string) (int64, error) {
+	// Start cache span
+	ctx, span := tracing.StartCacheSpan(ctx, "decr", key)
+	defer span.End()
+
 	if err := validateKey(key); err != nil {
+		tracing.RecordError(span, err)
 		return 0, err
 	}
 
 	val, err := c.client.Decr(ctx, key).Result()
 	if err != nil {
+		tracing.RecordError(span, err)
 		return 0, fmt.Errorf("%w: %v", ErrConnection, err)
 	}
 
+	tracing.SetAttributes(span, tracing.Int64("cache.value", val))
 	return val, nil
 }
 
 // IncrementBy increments a value by delta (extra Redis-specific method)
 func (c *RedisCache) IncrementBy(ctx context.Context, key string, delta int64) (int64, error) {
+	// Start cache span
+	ctx, span := tracing.StartCacheSpan(ctx, "incrby", key)
+	defer span.End()
+	tracing.SetAttributes(span, tracing.Int64("cache.delta", delta))
+
 	if err := validateKey(key); err != nil {
+		tracing.RecordError(span, err)
 		return 0, err
 	}
 
 	val, err := c.client.IncrBy(ctx, key, delta).Result()
 	if err != nil {
+		tracing.RecordError(span, err)
 		return 0, fmt.Errorf("%w: %v", ErrConnection, err)
 	}
 
+	tracing.SetAttributes(span, tracing.Int64("cache.value", val))
 	return val, nil
 }
 

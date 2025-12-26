@@ -10,6 +10,7 @@ import (
 	"doit/internal/data/db"
 	"doit/internal/metrics"
 	"doit/internal/model"
+	"doit/internal/tracing"
 	"doit/pkg/database"
 	"doit/pkg/validator"
 
@@ -45,9 +46,18 @@ func NewTodoServiceWithQuerier(querier db.Querier) *TodoService {
 
 // CreateTodo creates a new todo
 func (s *TodoService) CreateTodo(ctx context.Context, input model.CreateTodoInput) (*model.Todo, error) {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "create")
+	defer span.End()
+
+	// Validation span
+	ctx, validateSpan := tracing.StartSpan(ctx, tracing.TracerService, "todo.validate")
 	if err := s.validateCreateTodoInput(input); err != nil {
+		tracing.RecordError(validateSpan, err)
+		validateSpan.End()
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
+	validateSpan.End()
 
 	// Prepare metadata
 	metadata := input.Metadata
@@ -84,7 +94,8 @@ func (s *TodoService) CreateTodo(ctx context.Context, input model.CreateTodoInpu
 	if tags == nil {
 		tags = []string{}
 	}
-
+	// Database span
+	ctx, dbSpan := tracing.StartDBSpan(ctx, "insert", "todos")
 	start := time.Now()
 	todo, err := s.querier.CreateTodo(ctx, db.CreateTodoParams{
 		ID:          uuid.New(),
@@ -100,8 +111,18 @@ func (s *TodoService) CreateTodo(ctx context.Context, input model.CreateTodoInpu
 	duration := time.Since(start).Seconds()
 	metrics.RecordDatabaseQuery("create_todo", "todos", duration, err)
 	if err != nil {
+		tracing.RecordError(dbSpan, err)
+		dbSpan.End()
 		return nil, ErrTodoNotFound
 	}
+	tracing.SetAttributes(dbSpan, tracing.String("todo.id", todo.ID.String()))
+	dbSpan.End()
+
+	// Set result attributes on main span
+	tracing.SetAttributes(span,
+		tracing.String("todo.id", todo.ID.String()),
+		tracing.String("user.id", input.UserID.String()),
+	)
 
 	// Record business metric
 	metrics.RecordTodoOperation("create")
@@ -110,19 +131,33 @@ func (s *TodoService) CreateTodo(ctx context.Context, input model.CreateTodoInpu
 
 // GetTodoByID retrieves a todo by ID
 func (s *TodoService) GetTodoByID(ctx context.Context, todoID uuid.UUID, userID uuid.UUID) (*model.Todo, error) {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "get_by_id")
+	defer span.End()
+	tracing.SetAttributes(span,
+		tracing.String("todo.id", todoID.String()),
+		tracing.String("user.id", userID.String()),
+	)
+
+	// Database span
+	ctx, dbSpan := tracing.StartDBSpan(ctx, "select", "todos")
 	start := time.Now()
 	todo, err := s.querier.GetTodoByID(ctx, todoID)
 	duration := time.Since(start).Seconds()
 	metrics.RecordDatabaseQuery("get_todo_by_id", "todos", duration, err)
 	if err != nil {
+		tracing.RecordError(dbSpan, err)
+		dbSpan.End()
 		if err == pgx.ErrNoRows {
 			return nil, ErrTodoNotFound
 		}
 		return nil, fmt.Errorf("failed to get todo: %w", err)
 	}
+	dbSpan.End()
 
 	// Verify ownership
 	if err = VerifyOwnership(todo.UserID, userID, "todo"); err != nil {
+		tracing.RecordError(span, err)
 		return nil, err
 	}
 
@@ -133,6 +168,17 @@ func (s *TodoService) GetTodoByID(ctx context.Context, todoID uuid.UUID, userID 
 
 // ListUserTodos retrieves paginated todos for a user
 func (s *TodoService) ListUserTodos(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]*model.Todo, error) {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "list")
+	defer span.End()
+	tracing.SetAttributes(span,
+		tracing.String("user.id", userID.String()),
+		tracing.Int("pagination.limit", int(limit)),
+		tracing.Int("pagination.offset", int(offset)),
+	)
+
+	// Database span
+	ctx, dbSpan := tracing.StartDBSpan(ctx, "select", "todos")
 	start := time.Now()
 	todos, err := s.querier.ListTodosByUser(ctx, db.ListTodosByUserParams{
 		UserID: userID,
@@ -142,8 +188,15 @@ func (s *TodoService) ListUserTodos(ctx context.Context, userID uuid.UUID, limit
 	duration := time.Since(start).Seconds()
 	metrics.RecordDatabaseQuery("list_user_todos", "todos", duration, err)
 	if err != nil {
+		tracing.RecordError(dbSpan, err)
+		dbSpan.End()
 		return nil, fmt.Errorf("failed to list todos: %w", err)
 	}
+	tracing.SetAttributes(dbSpan, tracing.Int("db.rows_affected", len(todos)))
+	dbSpan.End()
+
+	// Set result count on main span
+	tracing.SetAttributes(span, tracing.Int("result.count", len(todos)))
 
 	// Record business metric
 	metrics.RecordTodoOperation("list")
@@ -152,6 +205,18 @@ func (s *TodoService) ListUserTodos(ctx context.Context, userID uuid.UUID, limit
 
 // ListTodosByStatus retrieves todos filtered by status
 func (s *TodoService) ListTodosByStatus(ctx context.Context, userID uuid.UUID, status model.TodoStatus, limit, offset int32) ([]*model.Todo, error) {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "list_by_status")
+	defer span.End()
+	tracing.SetAttributes(span,
+		tracing.String("user.id", userID.String()),
+		tracing.String("filter.status", string(status)),
+		tracing.Int("pagination.limit", int(limit)),
+		tracing.Int("pagination.offset", int(offset)),
+	)
+
+	// Database span
+	ctx, dbSpan := tracing.StartDBSpan(ctx, "select", "todos")
 	todos, err := s.querier.ListTodosByUserAndStatus(ctx, db.ListTodosByUserAndStatusParams{
 		UserID: userID,
 		Status: db.TodoStatus(status),
@@ -159,24 +224,42 @@ func (s *TodoService) ListTodosByStatus(ctx context.Context, userID uuid.UUID, s
 		Offset: offset,
 	})
 	if err != nil {
+		tracing.RecordError(dbSpan, err)
+		dbSpan.End()
 		return nil, fmt.Errorf("failed to list todos by status: %w", err)
 	}
+	tracing.SetAttributes(dbSpan, tracing.Int("db.rows_affected", len(todos)))
+	dbSpan.End()
 
+	tracing.SetAttributes(span, tracing.Int("result.count", len(todos)))
 	return s.toTodoModels(todos), nil
 }
 
 // UpdateTodo updates a todo
 func (s *TodoService) UpdateTodo(ctx context.Context, todoID uuid.UUID, userID uuid.UUID, input model.UpdateTodoInput) (*model.Todo, error) {
-	// First, verify ownership
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "update")
+	defer span.End()
+	tracing.SetAttributes(span,
+		tracing.String("todo.id", todoID.String()),
+		tracing.String("user.id", userID.String()),
+	)
+
+	// First, verify ownership - Database span for get
+	ctx, getSpan := tracing.StartDBSpan(ctx, "select", "todos")
 	existingTodo, err := s.querier.GetTodoByID(ctx, todoID)
 	if err != nil {
+		tracing.RecordError(getSpan, err)
+		getSpan.End()
 		if err == pgx.ErrNoRows {
 			return nil, ErrTodoNotFound
 		}
 		return nil, fmt.Errorf("failed to get todo: %w", err)
 	}
+	getSpan.End()
 
 	if err = VerifyOwnership(existingTodo.UserID, userID, "todo"); err != nil {
+		tracing.RecordError(span, err)
 		return nil, err
 	}
 
@@ -214,9 +297,10 @@ func (s *TodoService) UpdateTodo(ctx context.Context, todoID uuid.UUID, userID u
 	}
 
 	if input.Metadata != nil {
-		metadataJSON, err := json.Marshal(input.Metadata)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal metadata: %w", err)
+		metadataJSON, marshalErr := json.Marshal(input.Metadata)
+		if marshalErr != nil {
+			tracing.RecordError(span, marshalErr)
+			return nil, fmt.Errorf("failed to marshal metadata: %w", marshalErr)
 		}
 		params.Metadata = metadataJSON
 	}
@@ -227,17 +311,22 @@ func (s *TodoService) UpdateTodo(ctx context.Context, todoID uuid.UUID, userID u
 			Valid: true,
 		}
 	}
-	start := time.Now()
 
+	// Database span for update
+	ctx, updateSpan := tracing.StartDBSpan(ctx, "update", "todos")
+	start := time.Now()
 	todo, err := s.querier.UpdateTodo(ctx, params)
 	duration := time.Since(start).Seconds()
 	metrics.RecordDatabaseQuery("update_todo", "todos", duration, err)
 	if err != nil {
+		tracing.RecordError(updateSpan, err)
+		updateSpan.End()
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("todo not found")
 		}
 		return nil, fmt.Errorf("failed to update todo: %w", err)
 	}
+	updateSpan.End()
 
 	// Record business metric
 	metrics.RecordTodoOperation("update")
@@ -247,23 +336,38 @@ func (s *TodoService) UpdateTodo(ctx context.Context, todoID uuid.UUID, userID u
 // CompleteTodo marks a todo as completed
 // Uses transaction to ensure atomicity
 func (s *TodoService) CompleteTodo(ctx context.Context, todoID uuid.UUID, userID uuid.UUID) (*model.Todo, error) {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "complete")
+	defer span.End()
+	tracing.SetAttributes(span,
+		tracing.String("todo.id", todoID.String()),
+		tracing.String("user.id", userID.String()),
+	)
+
 	var todo db.Todo
 	var err error
+
+	// Transaction span
+	ctx, txSpan := tracing.StartSpan(ctx, tracing.TracerDB, "db.transaction")
 
 	// Use transaction with row locking
 	txErr := database.WithTransaction(ctx, s.pool.Pool, database.DefaultTxOptions(), func(tx pgx.Tx) error {
 		txQuerier := db.New(tx)
 
+		// Select for update span
+		_, selectSpan := tracing.StartDBSpan(ctx, "select_for_update", "todos")
 		start := time.Now()
-		// Lock the row for update
 		todo, err = txQuerier.GetTodoByIDForUpdate(ctx, todoID)
 		metrics.RecordDatabaseQuery("select_for_update", "todos", time.Since(start).Seconds(), err)
 		if err != nil {
+			tracing.RecordError(selectSpan, err)
+			selectSpan.End()
 			if err == pgx.ErrNoRows {
 				return fmt.Errorf("todo not found")
 			}
 			return fmt.Errorf("failed to get todo: %w", err)
 		}
+		selectSpan.End()
 
 		// Verify ownership
 		if todo.UserID != userID {
@@ -275,20 +379,27 @@ func (s *TodoService) CompleteTodo(ctx context.Context, todoID uuid.UUID, userID
 			return fmt.Errorf("todo is already completed")
 		}
 
+		// Complete span
+		_, completeSpan := tracing.StartDBSpan(ctx, "update", "todos")
 		start = time.Now()
-		// Complete the todo
 		todo, err = txQuerier.CompleteTodo(ctx, todoID)
 		metrics.RecordDatabaseQuery("complete_todo", "todos", time.Since(start).Seconds(), err)
 		if err != nil {
+			tracing.RecordError(completeSpan, err)
+			completeSpan.End()
 			return fmt.Errorf("failed to complete todo: %w", err)
 		}
+		completeSpan.End()
 
 		return nil
 	})
 
 	if txErr != nil {
+		tracing.RecordError(txSpan, txErr)
+		txSpan.End()
 		return nil, txErr
 	}
+	txSpan.End()
 
 	// Record business metric
 	metrics.RecordTodoOperation("complete")
@@ -297,34 +408,79 @@ func (s *TodoService) CompleteTodo(ctx context.Context, todoID uuid.UUID, userID
 
 // BulkCompleteTodos completes multiple todos
 func (s *TodoService) BulkCompleteTodos(ctx context.Context, todoIDs []uuid.UUID) error {
-	return database.WithTransaction(ctx, s.pool.Pool, database.DefaultTxOptions(), func(tx pgx.Tx) error {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "bulk_complete")
+	defer span.End()
+	tracing.SetAttributes(span, tracing.Int("todo.count", len(todoIDs)))
+
+	// Transaction span
+	ctx, txSpan := tracing.StartSpan(ctx, tracing.TracerDB, "db.transaction")
+
+	err := database.WithTransaction(ctx, s.pool.Pool, database.DefaultTxOptions(), func(tx pgx.Tx) error {
 		txQuerier := db.New(tx)
 
+		_, dbSpan := tracing.StartDBSpan(ctx, "bulk_update", "todos")
 		err := txQuerier.BulkUpdateTodoStatus(ctx, db.BulkUpdateTodoStatusParams{
 			Column1: todoIDs,
 			Status:  db.TodoStatusCompleted,
 		})
 		if err != nil {
+			tracing.RecordError(dbSpan, err)
+			dbSpan.End()
 			return fmt.Errorf("failed to bulk complete todos: %w", err)
 		}
+		tracing.SetAttributes(dbSpan, tracing.Int("db.rows_affected", len(todoIDs)))
+		dbSpan.End()
 
 		return nil
 	})
+
+	if err != nil {
+		tracing.RecordError(txSpan, err)
+	}
+	txSpan.End()
+
+	return err
 }
 
 // BulkDeleteTodos deletes multiple todos
 func (s *TodoService) BulkDeleteTodos(ctx context.Context, todoIDs []uuid.UUID, userID uuid.UUID) error {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "bulk_delete")
+	defer span.End()
+	tracing.SetAttributes(span,
+		tracing.String("user.id", userID.String()),
+		tracing.Int("todo.count", len(todoIDs)),
+	)
+
+	// Database span
+	ctx, dbSpan := tracing.StartDBSpan(ctx, "delete", "todos")
 	err := s.querier.HardDeleteTodos(ctx, db.HardDeleteTodosParams{
 		Column1: todoIDs,
 		UserID:  userID,
 	})
 	if err != nil {
+		tracing.RecordError(dbSpan, err)
+		dbSpan.End()
 		return fmt.Errorf("failed to hard delete todos: %w", err)
 	}
+	tracing.SetAttributes(dbSpan, tracing.Int("db.rows_affected", len(todoIDs)))
+	dbSpan.End()
+
 	return nil
 }
 
 func (s *TodoService) DeleteTodo(ctx context.Context, todoID uuid.UUID, userID uuid.UUID) error {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "delete")
+	defer span.End()
+	tracing.SetAttributes(span,
+		tracing.String("todo.id", todoID.String()),
+		tracing.String("user.id", userID.String()),
+	)
+
+	// Database span
+	ctx, dbSpan := tracing.StartDBSpan(ctx, "delete", "todos")
 	start := time.Now()
 	err := s.querier.HardDeleteTodo(ctx, db.HardDeleteTodoParams{
 		ID:     todoID,
@@ -332,17 +488,38 @@ func (s *TodoService) DeleteTodo(ctx context.Context, todoID uuid.UUID, userID u
 	})
 	metrics.RecordDatabaseQuery("delete", "todos", time.Since(start).Seconds(), err)
 	if err != nil {
+		tracing.RecordError(dbSpan, err)
+		dbSpan.End()
 		return fmt.Errorf("failed to hard delete todo: %w", err)
 	}
+	dbSpan.End()
+
 	return nil
 }
 
 // GetTodoStats retrieves aggregated statistics
 func (s *TodoService) GetTodoStats(ctx context.Context, userID uuid.UUID) (*model.TodoStats, error) {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "get_stats")
+	defer span.End()
+	tracing.SetAttributes(span, tracing.String("user.id", userID.String()))
+
+	// Database span
+	ctx, dbSpan := tracing.StartDBSpan(ctx, "select", "todos")
 	stats, err := s.querier.GetTodoStats(ctx, userID)
 	if err != nil {
+		tracing.RecordError(dbSpan, err)
+		dbSpan.End()
 		return nil, fmt.Errorf("failed to get todo stats: %w", err)
 	}
+	dbSpan.End()
+
+	// Add stats to span
+	tracing.SetAttributes(span,
+		tracing.Int64("stats.total", stats.Total),
+		tracing.Int64("stats.pending", stats.Pending),
+		tracing.Int64("stats.completed", stats.Completed),
+	)
 
 	return &model.TodoStats{
 		Total:      stats.Total,
@@ -355,54 +532,110 @@ func (s *TodoService) GetTodoStats(ctx context.Context, userID uuid.UUID) (*mode
 
 // CountUserTodos counts total todos for a user
 func (s *TodoService) CountUserTodos(ctx context.Context, userID uuid.UUID) (int64, error) {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "count")
+	defer span.End()
+	tracing.SetAttributes(span, tracing.String("user.id", userID.String()))
+
+	// Database span
+	ctx, dbSpan := tracing.StartDBSpan(ctx, "count", "todos")
 	count, err := s.querier.CountUserTodos(ctx, userID)
 	if err != nil {
+		tracing.RecordError(dbSpan, err)
+		dbSpan.End()
 		return 0, fmt.Errorf("failed to count todos: %w", err)
 	}
+	tracing.SetAttributes(dbSpan, tracing.Int64("db.count", count))
+	dbSpan.End()
+
+	tracing.SetAttributes(span, tracing.Int64("result.count", count))
 	return count, nil
 }
 
 // SearchTodosByTitle searches todos by title
 func (s *TodoService) SearchTodosByTitle(ctx context.Context, userID uuid.UUID, query string, limit int32) ([]*model.Todo, error) {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "search")
+	defer span.End()
+	tracing.SetAttributes(span,
+		tracing.String("user.id", userID.String()),
+		tracing.String("search.query", query),
+		tracing.Int("pagination.limit", int(limit)),
+	)
+
 	// validate search query
 	if err := validator.ValidateSearchQuery(query); err != nil {
+		tracing.RecordError(span, err)
 		return nil, fmt.Errorf("invalid search query: %w", err)
 	}
 
 	// sanitize search query
 	query = validator.SanitizeString(query, 100)
 
+	// Database span
+	ctx, dbSpan := tracing.StartDBSpan(ctx, "search", "todos")
 	todos, err := s.querier.SearchTodosByTitle(ctx, db.SearchTodosByTitleParams{
 		UserID:  userID,
 		Column2: &query,
 		Limit:   limit,
 	})
 	if err != nil {
+		tracing.RecordError(dbSpan, err)
+		dbSpan.End()
 		return nil, fmt.Errorf("failed to search todos: %w", err)
 	}
+	tracing.SetAttributes(dbSpan, tracing.Int("db.rows_affected", len(todos)))
+	dbSpan.End()
 
+	tracing.SetAttributes(span, tracing.Int("result.count", len(todos)))
 	return s.toTodoModels(todos), nil
 }
 
 // GetTodosByTags retrieves todos with specific tags
 func (s *TodoService) GetTodosByTags(ctx context.Context, userID uuid.UUID, tags []string) ([]*model.Todo, error) {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "get_by_tags")
+	defer span.End()
+	tracing.SetAttributes(span,
+		tracing.String("user.id", userID.String()),
+		tracing.Int("filter.tags_count", len(tags)),
+	)
+
+	// Database span
+	ctx, dbSpan := tracing.StartDBSpan(ctx, "select", "todos")
 	todos, err := s.querier.GetTodosByTags(ctx, db.GetTodosByTagsParams{
 		UserID:  userID,
 		Column2: tags,
 	})
 	if err != nil {
+		tracing.RecordError(dbSpan, err)
+		dbSpan.End()
 		return nil, fmt.Errorf("failed to get todos by tags: %w", err)
 	}
+	tracing.SetAttributes(dbSpan, tracing.Int("db.rows_affected", len(todos)))
+	dbSpan.End()
 
+	tracing.SetAttributes(span, tracing.Int("result.count", len(todos)))
 	return s.toTodoModels(todos), nil
 }
 
 // GetOverdueTodos retrieves overdue todos across all users (admin function)
 func (s *TodoService) GetOverdueTodos(ctx context.Context, limit int32) ([]*model.Todo, error) {
+	// Start service span
+	ctx, span := tracing.StartServiceSpan(ctx, "todo", "get_overdue")
+	defer span.End()
+	tracing.SetAttributes(span, tracing.Int("pagination.limit", int(limit)))
+
+	// Database span
+	ctx, dbSpan := tracing.StartDBSpan(ctx, "select", "todos")
 	results, err := s.querier.GetOverdueTodos(ctx, limit)
 	if err != nil {
+		tracing.RecordError(dbSpan, err)
+		dbSpan.End()
 		return nil, fmt.Errorf("failed to get overdue todos: %w", err)
 	}
+	tracing.SetAttributes(dbSpan, tracing.Int("db.rows_affected", len(results)))
+	dbSpan.End()
 
 	todos := make([]*model.Todo, len(results))
 	for i, result := range results {
@@ -423,6 +656,7 @@ func (s *TodoService) GetOverdueTodos(ctx context.Context, limit int32) ([]*mode
 		todos[i] = s.toTodoModel(todo)
 	}
 
+	tracing.SetAttributes(span, tracing.Int("result.count", len(todos)))
 	return todos, nil
 }
 
