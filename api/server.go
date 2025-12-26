@@ -45,9 +45,17 @@ func NewServer(logger *logger.Logger, cfg *config.Config, dbPool *database.Pool,
 	authMiddleware := middlewares.AuthMiddleware(tokenService)
 	securityHeadersMiddleware := middlewares.SecurityHeaders()
 	metricsMiddleware := middlewares.Metrics()
+	tracingMiddleware := middlewares.Tracing()
 
 	// Web App
-	app := web.NewApp(errorMiddleware, metricsMiddleware, panicMiddleware, securityHeadersMiddleware, corsMiddleware)
+	app := web.NewApp(
+		tracingMiddleware,         // 1. Outermost - captures everything
+		errorMiddleware,           // 2. Error handling
+		metricsMiddleware,         // 3. Prometheus metrics
+		panicMiddleware,           // 4. Panic recovery
+		securityHeadersMiddleware, // 5. Security headers
+		corsMiddleware,            // 6. CORS handling
+	)
 
 	// Handlers
 	authHandler := auth.NewHandler(logger, userService, tokenService, cfg)

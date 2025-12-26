@@ -65,6 +65,12 @@ type SecurityConfig struct {
 	TLSKeyFile        string   `env:"TLS_KEY_FILE" flag:"tls_key_file"`
 }
 
+type TracingConfig struct {
+	Enabled      bool    `env:"ENABLED" flag:"tracing_enabled" default:"true"`
+	OTLPEndpoint string  `env:"OTLP_ENDPOINT" flag:"otlp_endpoint" default:"localhost:4317"`
+	SampleRate   float64 `env:"SAMPLE_RATE" flag:"tracing_sample_rate" default:"1.0"`
+}
+
 type Config struct {
 	Server   ServerConfig   `prefix:"SERVER_"`
 	App      AppConfig      `prefix:"APP_"`
@@ -72,6 +78,7 @@ type Config struct {
 	JWT      JWTConfig      `prefix:"JWT_"`
 	Security SecurityConfig `prefix:"SECURITY_"`
 	Redis    RedisConfig    `prefix:"REDIS_"`
+	Tracing  TracingConfig  `prefix:"TRACING_"`
 }
 
 // Validate checks if the configuration is valid

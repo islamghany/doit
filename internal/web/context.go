@@ -49,3 +49,18 @@ func SetStatusCode(ctx context.Context, statusCode int) {
 	}
 	val.StatusCode = statusCode
 }
+
+// SetTraceID updates the trace ID in the context values.
+// This is used by the tracing middleware to set the OpenTelemetry trace ID.
+func SetTraceID(ctx context.Context, traceID string) context.Context {
+	val, ok := ctx.Value(key).(*Values)
+	if !ok {
+		// If no values exist, create new ones
+		return SetValues(ctx, Values{
+			TraceID: traceID,
+			Time:    time.Now(),
+		})
+	}
+	val.TraceID = traceID
+	return ctx
+}

@@ -84,6 +84,24 @@ help:
 	@echo "🛠️  Development Database:"
 	@echo "  dev-db         - Start development database container"
 	@echo "  dev-db-stop    - Stop development database container"
+	@echo ""
+	@echo "🚀 Local Development (Hybrid Mode - FAST!):"
+	@echo "  dev-setup      - Initial setup for local development"
+	@echo "  dev-start      - Start everything (infra + migrate + API)"
+	@echo "  dev-infra      - Start infrastructure only (DB, Redis, Jaeger, etc.)"
+	@echo "  dev-infra-down - Stop infrastructure"
+	@echo "  dev-infra-down-v - Stop infrastructure and remove volumes"
+	@echo "  dev-infra-ps   - Show infrastructure status"
+	@echo "  dev-infra-logs - View infrastructure logs"
+	@echo "  dev-migrate    - Run migrations against local Docker DB"
+	@echo "  dev-run        - Run Go API locally (connects to Docker infra)"
+	@echo "  dev-run-race   - Run Go API with race detector"
+	@echo "  dev-build      - Build Go API binary"
+	@echo "  dev-seed       - Seed database with development data"
+	@echo "  dev-test       - Run tests with local infrastructure"
+	@echo "  dev-health     - Check health of all services"
+	@echo "  dev-restart    - Restart infrastructure"
+	@echo "  dev-clean      - Clean up development environment"
 
 # Build the application
 build:
@@ -512,4 +530,194 @@ metrics-view-sc:
 
 metrics-view:
 	expvarmon -ports="localhost:4020" -endpoint="/metrics" -vars="build,requests,goroutines,errors,panics,mem:memstats.HeapAlloc,mem:memstats.HeapSys,mem:memstats.Sys"
+
+# ===========================================
+# 🚀 Local Development (Hybrid Mode)
+# ===========================================
+# Run infrastructure in Docker, Go API locally
+# This is MUCH faster for development iterations!
+# ===========================================
+
+## dev-infra: Start only infrastructure (DB, Redis, Jaeger, Prometheus, Grafana)
+.PHONY: dev-infra
+dev-infra:
+	@echo "🚀 Starting infrastructure services..."
+	docker-compose -f docker-compose.infra.yml up 
+	@echo ""
+	@echo "✅ Infrastructure started!"
+	@echo ""
+	@echo "📍 Services available at:"
+	@echo "   PostgreSQL:  localhost:5432"
+	@echo "   Redis:       localhost:6379"
+	@echo "   Jaeger UI:   http://localhost:16686"
+	@echo "   Prometheus:  http://localhost:9090"
+	@echo "   Grafana:     http://localhost:3000 (admin/admin)"
+	@echo "   Adminer:     http://localhost:8081"
+	@echo ""
+	@echo "📝 Next steps:"
+	@echo "   1. Run migrations: make dev-migrate"
+	@echo "   2. Start API:      make dev-run"
+
+## dev-infra-down: Stop infrastructure services
+.PHONY: dev-infra-down
+dev-infra-down:
+	@echo "🛑 Stopping infrastructure services..."
+	docker-compose -f docker-compose.infra.yml down
+	@echo "✅ Infrastructure stopped!"
+
+## dev-infra-down-v: Stop infrastructure and remove volumes (⚠️  deletes data!)
+.PHONY: dev-infra-down-v
+dev-infra-down-v:
+	@echo "🛑 Stopping infrastructure and removing volumes..."
+	docker-compose -f docker-compose.infra.yml down -v
+	@echo "✅ Infrastructure stopped and volumes removed!"
+
+## dev-infra-logs: View infrastructure logs
+.PHONY: dev-infra-logs
+dev-infra-logs:
+	docker-compose -f docker-compose.infra.yml logs -f
+
+## dev-infra-ps: Show infrastructure status
+.PHONY: dev-infra-ps
+dev-infra-ps:
+	docker-compose -f docker-compose.infra.yml ps
+
+## dev-migrate: Run migrations against local Docker DB
+.PHONY: dev-migrate
+dev-migrate:
+	@echo "🗄️  Running migrations..."
+	migrate -path internal/data/migrations -database "postgresql://doit:doit123@localhost:5432/doit?sslmode=disable" up
+	@echo "✅ Migrations complete!"
+
+## dev-migrate-down: Rollback migrations
+.PHONY: dev-migrate-down
+dev-migrate-down:
+	@echo "🗄️  Rolling back migrations..."
+	migrate -path internal/data/migrations -database "postgresql://doit:doit123@localhost:5432/doit?sslmode=disable" down 1
+	@echo "✅ Rollback complete!"
+
+## dev-migrate-reset: Reset all migrations (⚠️  deletes all data!)
+.PHONY: dev-migrate-reset
+dev-migrate-reset:
+	@echo "⚠️  Resetting all migrations..."
+	migrate -path internal/data/migrations -database "postgresql://doit:doit123@localhost:5432/doit?sslmode=disable" drop -f
+	migrate -path internal/data/migrations -database "postgresql://doit:doit123@localhost:5432/doit?sslmode=disable" up
+	@echo "✅ Migrations reset!"
+
+## dev-run: Run Go API locally (connects to Docker infrastructure)
+.PHONY: dev-run
+dev-run:
+	@echo "🚀 Starting API locally..."
+	@echo "   Make sure infrastructure is running: make dev-infra"
+	@echo ""
+	@if [ -f .env.local ]; then \
+		set -a && . ./.env.local && set +a && go run ./cmd/doit; \
+	else \
+		echo "⚠️  .env.local not found!"; \
+		echo "   Creating from template..."; \
+		cp env.local.example .env.local; \
+		echo "✅ Created .env.local - you can customize it if needed"; \
+		set -a && . ./.env.local && set +a && go run ./cmd/doit; \
+	fi
+
+## dev-run-race: Run Go API locally with race detector
+.PHONY: dev-run-race
+dev-run-race:
+	@echo "🚀 Starting API locally with race detector..."
+	@if [ -f .env.local ]; then \
+		set -a && . ./.env.local && set +a && go run -race ./cmd/doit; \
+	else \
+		cp env.local.example .env.local; \
+		set -a && . ./.env.local && set +a && go run -race ./cmd/doit; \
+	fi
+
+## dev-build: Build Go API for local testing
+.PHONY: dev-build
+dev-build:
+	@echo "🔨 Building API..."
+	go build -o bin/doit ./cmd/doit
+	@echo "✅ Built: bin/doit"
+
+## dev-start: Start infrastructure, run migrations, and start API (all-in-one)
+.PHONY: dev-start
+dev-start: dev-infra
+	@echo "⏳ Waiting for services to be healthy..."
+	@sleep 5
+	@$(MAKE) dev-migrate
+	@$(MAKE) dev-run
+
+## dev-setup: Initial setup for local development
+.PHONY: dev-setup
+dev-setup:
+	@echo "🔧 Setting up local development environment..."
+	@if [ ! -f .env.local ]; then \
+		cp env.local.example .env.local; \
+		echo "✅ Created .env.local"; \
+	else \
+		echo "ℹ️  .env.local already exists"; \
+	fi
+	@echo ""
+	@echo "📝 Quick Start:"
+	@echo "   1. make dev-infra      # Start infrastructure"
+	@echo "   2. make dev-migrate    # Run migrations"
+	@echo "   3. make dev-run        # Start API"
+	@echo ""
+	@echo "   Or all at once:"
+	@echo "   make dev-start"
+
+## dev-seed: Seed database with development data
+.PHONY: dev-seed
+dev-seed:
+	@echo "🌱 Seeding database..."
+	@if [ -f .env.local ]; then \
+		set -a && . ./.env.local && set +a && go run ./cmd/seed; \
+	else \
+		cp env.local.example .env.local; \
+		set -a && . ./.env.local && set +a && go run ./cmd/seed; \
+	fi
+	@echo "✅ Seeding complete!"
+
+## dev-test: Run tests with local infrastructure
+.PHONY: dev-test
+dev-test:
+	@echo "🧪 Running tests..."
+	@if [ -f .env.local ]; then \
+		set -a && . ./.env.local && set +a && go test -v -race ./...; \
+	else \
+		go test -v -race ./...; \
+	fi
+
+## dev-clean: Clean up development environment
+.PHONY: dev-clean
+dev-clean: dev-infra-down
+	@echo "🧹 Cleaning up..."
+	rm -rf bin/ tmp/
+	@echo "✅ Cleanup complete!"
+
+## dev-restart: Restart infrastructure
+.PHONY: dev-restart
+dev-restart:
+	@echo "🔄 Restarting infrastructure..."
+	docker-compose -f docker-compose.infra.yml restart
+	@echo "✅ Infrastructure restarted!"
+
+## dev-health: Check health of all infrastructure services
+.PHONY: dev-health
+dev-health:
+	@echo "🏥 Checking infrastructure health..."
+	@echo ""
+	@echo "PostgreSQL:"
+	@docker-compose -f docker-compose.infra.yml exec -T postgres pg_isready -U doit -d doit 2>/dev/null && echo "  ✅ Healthy" || echo "  ❌ Not healthy"
+	@echo ""
+	@echo "Redis:"
+	@docker-compose -f docker-compose.infra.yml exec -T redis redis-cli ping 2>/dev/null | grep -q PONG && echo "  ✅ Healthy" || echo "  ❌ Not healthy"
+	@echo ""
+	@echo "Jaeger:"
+	@curl -s http://localhost:16686 > /dev/null && echo "  ✅ Healthy (http://localhost:16686)" || echo "  ❌ Not healthy"
+	@echo ""
+	@echo "Prometheus:"
+	@curl -s http://localhost:9090/-/healthy > /dev/null && echo "  ✅ Healthy (http://localhost:9090)" || echo "  ❌ Not healthy"
+	@echo ""
+	@echo "Grafana:"
+	@curl -s http://localhost:3000/api/health > /dev/null && echo "  ✅ Healthy (http://localhost:3000)" || echo "  ❌ Not healthy"
 

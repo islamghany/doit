@@ -36,6 +36,8 @@ services:
         condition: service_healthy # 🔑 Waits for cache to be ready
       migrations:
         condition: service_completed_successfully # 🔑 Wait for migrations to finish!
+      jaeger:
+        condition: service_healthy # 🔑 Wait for Jaeger to be ready
     environment:
       # Database
       DB_HOST: postgres
@@ -69,6 +71,11 @@ services:
       SERVER_WRITE_TIMEOUT: 10
       SERVER_SHUTDOWN_TIMEOUT: 30
       SERVER_DEBUG_PORT: 6060
+
+       # Tracing
+      TRACING_ENABLED: ${TRACING_ENABLED:-true}
+      TRACING_OTLP_ENDPOINT: jaeger:4317
+      TRACING_SAMPLE_RATE: ${TRACING_SAMPLE_RATE:-1.0}
     # volumes:
     #   - ./:/app # Mount source code for development (hot reload) - DISABLED: overwrites binary
     healthcheck:
@@ -212,6 +219,27 @@ services:
       start_period: 30s
     networks:
       - doit_network
+    restart: unless-stopped
+
+  # ===========================================
+  # Jaeger - Distributed Tracing
+  # ===========================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.53
+    container_name: doit-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC receiver
+      - "4318:4318"     # OTLP HTTP receiver
+    networks:
+      - doit_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
   # ============================================

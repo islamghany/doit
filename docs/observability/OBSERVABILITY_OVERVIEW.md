@@ -73,15 +73,15 @@ Observability is the ability to understand the **internal state** of a system by
 
 ## Comparison Table
 
-| Aspect | Logs | Metrics | Traces |
-|--------|------|---------|--------|
-| **Data Type** | Text/JSON events | Numeric time-series | Structured spans |
-| **Cardinality** | High (unique per event) | Low (aggregated) | Medium (per request) |
-| **Storage Cost** | High | Low | Medium |
-| **Query Speed** | Slow (search) | Fast (indexed) | Medium |
-| **Best For** | Debugging details | Alerting, trends | Request flow |
-| **Sampling** | Optional | No | Often required |
-| **Tool Example** | Loki, ELK | Prometheus | Jaeger, Tempo |
+| Aspect           | Logs                    | Metrics             | Traces               |
+| ---------------- | ----------------------- | ------------------- | -------------------- |
+| **Data Type**    | Text/JSON events        | Numeric time-series | Structured spans     |
+| **Cardinality**  | High (unique per event) | Low (aggregated)    | Medium (per request) |
+| **Storage Cost** | High                    | Low                 | Medium               |
+| **Query Speed**  | Slow (search)           | Fast (indexed)      | Medium               |
+| **Best For**     | Debugging details       | Alerting, trends    | Request flow         |
+| **Sampling**     | Optional                | No                  | Often required       |
+| **Tool Example** | Loki, ELK               | Prometheus          | Jaeger, Tempo        |
 
 ---
 
@@ -164,14 +164,14 @@ Observability is the ability to understand the **internal state** of a system by
 
 ### 2. The Right Tool for the Right Question
 
-| Question | Best Tool |
-|----------|-----------|
-| "Is something wrong?" | Metrics (alerts) |
-| "What's the trend?" | Metrics (graphs) |
-| "Where is the bottleneck?" | Traces (waterfall) |
+| Question                      | Best Tool            |
+| ----------------------------- | -------------------- |
+| "Is something wrong?"         | Metrics (alerts)     |
+| "What's the trend?"           | Metrics (graphs)     |
+| "Where is the bottleneck?"    | Traces (waterfall)   |
 | "What services are affected?" | Traces (service map) |
-| "What exactly happened?" | Logs (search) |
-| "What was the error message?" | Logs (details) |
+| "What exactly happened?"      | Logs (search)        |
+| "What was the error message?" | Logs (details)       |
 
 ### 3. Cost vs. Value Trade-off
 
@@ -199,12 +199,12 @@ Observability is the ability to understand the **internal state** of a system by
 
 ## Implementation Phases in DoIt
 
-| Phase | Component | Status | Documentation |
-|-------|-----------|--------|---------------|
-| 3.1 | Structured Logging | Planned | - |
-| 3.2 | Prometheus Metrics | ✅ Done | [Prometheus Mental Model](./PROMETHEUS_MENTAL_MODEL.md) |
-| 3.2 | Grafana Dashboards | ✅ Done | [Grafana Mental Model](./GRAFANA_MENTAL_MODEL.md) |
-| 3.3 | Distributed Tracing | Planned | [Tracing Mental Model](./DISTRIBUTED_TRACING_MENTAL_MODEL.md) |
+| Phase | Component           | Status  | Documentation                                                 |
+| ----- | ------------------- | ------- | ------------------------------------------------------------- |
+| 3.1   | Structured Logging  | Planned | -                                                             |
+| 3.2   | Prometheus Metrics  | ✅ Done | [Prometheus Mental Model](./PROMETHEUS_MENTAL_MODEL.md)       |
+| 3.2   | Grafana Dashboards  | ✅ Done | [Grafana Mental Model](./GRAFANA_MENTAL_MODEL.md)             |
+| 3.3   | Distributed Tracing | Planned | [Tracing Mental Model](./DISTRIBUTED_TRACING_MENTAL_MODEL.md) |
 
 ---
 
@@ -213,4 +213,3 @@ Observability is the ability to understand the **internal state** of a system by
 - [Prometheus Mental Model](./PROMETHEUS_MENTAL_MODEL.md) - Deep dive into metrics
 - [Grafana Mental Model](./GRAFANA_MENTAL_MODEL.md) - Visualization and dashboards
 - [Distributed Tracing Mental Model](./DISTRIBUTED_TRACING_MENTAL_MODEL.md) - Request flow tracking
-

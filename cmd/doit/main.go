@@ -45,9 +45,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"doit/api"
 	"doit/internal/config"
+	"doit/internal/tracing"
 	"doit/internal/web"
 	"doit/pkg/logger"
 )
@@ -82,6 +84,37 @@ func main() {
 		"commit", Commit,
 		"buildDate", BuildDate,
 	)
+
+	// Initialize tracing
+	tp, err := tracing.NewProvider(ctx, tracing.Config{
+		ServiceName:    "doit-api",
+		ServiceVersion: Version,
+		Environment:    string(cfg.App.Environment),
+		OTLPEndpoint:   cfg.Tracing.OTLPEndpoint,
+		SampleRate:     cfg.Tracing.SampleRate,
+		Enabled:        cfg.Tracing.Enabled,
+	})
+	if err != nil {
+		log.Error(ctx, "Failed to initialize tracing", "error", err)
+		os.Exit(1)
+	}
+	// Ensure tracing is shut down gracefully
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := tp.Shutdown(shutdownCtx); err != nil {
+			log.Error(ctx, "Failed to shutdown tracing", "error", err)
+		}
+	}()
+
+	if cfg.Tracing.Enabled {
+		log.Info(ctx, "Tracing initialized",
+			"endpoint", cfg.Tracing.OTLPEndpoint,
+			"sampleRate", cfg.Tracing.SampleRate,
+		)
+	} else {
+		log.Info(ctx, "Tracing is disabled")
+	}
 
 	// Start application
 	log.Info(ctx, "Starting application",
