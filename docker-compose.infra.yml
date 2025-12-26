@@ -111,7 +111,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
-      - ./infra/docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/docker/grafana/provisioning-dev:/etc/grafana/provisioning:ro
       - ./infra/docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_dev_data:/var/lib/grafana
     depends_on:

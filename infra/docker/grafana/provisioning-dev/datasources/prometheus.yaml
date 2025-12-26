@@ -1,5 +1,6 @@
-# Grafana Datasource Configuration (Production/Full Docker Compose)
-# Uses Docker network hostnames
+# Grafana Datasource Configuration (Dev Environment)
+# Uses Docker network hostnames (not localhost!)
+# Grafana runs inside Docker, so it needs to reach other containers by their service names
 
 apiVersion: 1
 
@@ -11,6 +12,7 @@ datasources:
     type: prometheus
     uid: Prometheus
     access: proxy
+    # Use Docker service name, NOT localhost
     url: http://prometheus:9090
     isDefault: true
     editable: false
@@ -30,6 +32,7 @@ datasources:
     type: jaeger
     uid: Jaeger
     access: proxy
+    # Use Docker service name, NOT localhost
     url: http://jaeger:16686
     editable: false
     jsonData:
