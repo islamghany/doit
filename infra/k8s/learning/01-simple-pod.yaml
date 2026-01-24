@@ -1,0 +1,36 @@
+# =============================================================================
+# LEARNING: Your First Pod
+# =============================================================================
+# This is the simplest Kubernetes object - a single Pod running nginx
+#
+# A Pod is:
+# - The smallest deployable unit in Kubernetes
+# - A wrapper around one or more containers
+# - Has its own IP address
+# - Ephemeral (can be killed and recreated anytime)
+#
+# ⚠️  In production, you NEVER create Pods directly!
+#     You use Deployments which manage Pods for you.
+#     This is just for learning.
+# =============================================================================
+
+apiVersion: v1 # API version for Pod resource
+kind: Pod # Type of resource
+metadata:
+  name: my-first-pod # Name of the pod (must be unique in namespace)
+  labels: # Labels for identification and selection
+    app: nginx
+    purpose: learning
+spec:
+  containers: # List of containers in this pod
+    - name: nginx # Container name
+      image: nginx:alpine # Docker image to use
+      ports:
+        - containerPort: 80 # Port the container listens on
+      resources: # Resource limits (best practice!)
+        requests: # Minimum resources needed
+          memory: "64Mi" # 64 megabytes
+          cpu: "100m" # 100 millicores = 0.1 CPU
+        limits: # Maximum resources allowed
+          memory: "128Mi" # 128 megabytes
+          cpu: "200m" # 200 millicores = 0.2 CPU

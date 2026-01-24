@@ -1,0 +1,53 @@
+# ============================================================================
+# KUBERNETES SERVICE - Learning Example
+# ============================================================================
+# A Service provides a stable endpoint to access a group of Pods.
+# It uses labels to find which Pods to send traffic to.
+# ============================================================================
+
+apiVersion: v1 # Services are in core API (v1), not apps/v1
+kind: Service
+metadata:
+  name: nginx-service # Name of the Service
+
+spec:
+  # --------------------------------------------------------------------------
+  # TYPE - How is this service exposed?
+  # --------------------------------------------------------------------------
+  # ClusterIP (default): Only accessible inside the cluster
+  # NodePort: Accessible from outside via NodeIP:NodePort
+  # LoadBalancer: Gets external IP from cloud provider
+  type: ClusterIP
+
+  # --------------------------------------------------------------------------
+  # SELECTOR - Which Pods does this Service target?
+  # --------------------------------------------------------------------------
+  # The Service will send traffic to ALL pods with these labels
+  selector:
+    app: nginx # Must match the labels on our Deployment's pods!
+
+  # --------------------------------------------------------------------------
+  # PORTS - How to map ports
+  # --------------------------------------------------------------------------
+  ports:
+    - name: http # Optional but good practice to name ports
+      protocol: TCP
+      port: 80 # Port the SERVICE listens on
+      targetPort: 80 # Port the POD listens on (container port)
+
+# ============================================================================
+# PORT MAPPING EXPLAINED:
+# ============================================================================
+#
+#   Client ──► Service:80 ──► Pod:80
+#              (port)         (targetPort)
+#
+#   "port" = What clients connect TO
+#   "targetPort" = Where traffic goes (the container's port)
+#
+#   They can be different! For example:
+#   - Service port: 8080 (clients connect to 8080)
+#   - Target port: 80 (but pods run on 80)
+#
+# ============================================================================
+

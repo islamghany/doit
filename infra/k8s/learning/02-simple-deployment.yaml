@@ -1,0 +1,53 @@
+# ============================================================================
+# KUBERNETES DEPLOYMENT - Learning Example
+# ============================================================================
+# A Deployment manages Pods for you, ensuring the desired number are always
+# running. If a Pod dies, the Deployment automatically creates a new one.
+# ============================================================================
+
+apiVersion: apps/v1 # API version for Deployments (different from Pods!)
+kind: Deployment # This is a Deployment, not a Pod
+metadata:
+  name: nginx-deployment # Name of this Deployment
+  labels:
+    app: nginx # Labels for the Deployment itself
+
+# ============================================================================
+# SPEC - This is where we define WHAT we want
+# ============================================================================
+spec:
+  # --------------------------------------------------------------------------
+  # REPLICAS - How many Pods do we want running?
+  # --------------------------------------------------------------------------
+  replicas: 3 # "I want 3 copies of this Pod running at all times"
+
+  # --------------------------------------------------------------------------
+  # SELECTOR - How does the Deployment find its Pods?
+  # --------------------------------------------------------------------------
+  # The Deployment needs to know which Pods belong to it.
+  # It uses labels to find them. This MUST match the Pod template labels below.
+  selector:
+    matchLabels:
+      app: nginx # "Find all Pods with label app=nginx"
+
+  # --------------------------------------------------------------------------
+  # TEMPLATE - What should each Pod look like?
+  # --------------------------------------------------------------------------
+  # This is basically the same as our Pod definition, but without apiVersion/kind
+  template:
+    metadata:
+      labels:
+        app: nginx # IMPORTANT: Must match selector.matchLabels above!
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          resources:
+            limits:
+              cpu: "200m" # 200 millicores = 0.2 CPU
+              memory: "128Mi" # 128 megabytes
+            requests:
+              cpu: "100m" # 100 millicores = 0.1 CPU
+              memory: "64Mi" # 64 megabytes

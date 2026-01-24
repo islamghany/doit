@@ -1,0 +1,39 @@
+# ============================================================================
+# KUBERNETES NODEPORT SERVICE - Learning Example
+# ============================================================================
+# A NodePort service exposes your app on a port on EVERY node in the cluster.
+# This allows external access without a cloud load balancer.
+# ============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-nodeport # Different name from ClusterIP service
+
+spec:
+  type: NodePort # ← This is the key difference!
+
+  selector:
+    app: nginx # Same selector - targets same pods
+
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80 # Service port (inside cluster)
+      targetPort: 80 # Pod port
+      nodePort: 30080 # ← NEW! Port on the NODE (30000-32767)
+
+# ============================================================================
+# NODEPORT EXPLAINED:
+# ============================================================================
+#
+#   From OUTSIDE the cluster:
+#   Browser ──► localhost:30080 ──► NodePort Service ──► Pod:80
+#
+#   From INSIDE the cluster:
+#   Pod ──► nginx-nodeport:80 ──► NodePort Service ──► Pod:80
+#
+#   The nodePort (30080) is the "external door" to your service.
+#
+# ============================================================================
+
