@@ -1,0 +1,29 @@
+# ============================================================================
+# KUBERNETES CONFIGMAP - Learning Example
+# ============================================================================
+# A ConfigMap stores NON-SENSITIVE configuration data as key-value pairs.
+# Your pods can consume this data as environment variables or mounted files.
+# ============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config # Name to reference this ConfigMap
+
+# ============================================================================
+# DATA - Key-value pairs of configuration
+# ============================================================================
+data:
+  # Simple key-value pairs (become environment variables)
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "doit"
+  LOG_LEVEL: "info"
+
+  # You can also store entire config files!
+  # This creates a file called "app.properties" when mounted
+  app.properties: |
+    server.port=8080
+    server.timeout=30s
+    feature.new-ui=true
+    feature.dark-mode=false

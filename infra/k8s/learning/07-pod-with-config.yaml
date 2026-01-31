@@ -1,0 +1,96 @@
+# ============================================================================
+# POD USING CONFIGMAP AND SECRET - Learning Example
+# ============================================================================
+# This Pod demonstrates how to inject configuration from ConfigMaps and
+# Secrets into your containers as environment variables and files.
+# ============================================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-demo-pod
+  labels:
+    app: config-demo
+
+spec:
+  containers:
+    - name: demo
+      image: busybox
+      command: ["sleep", "3600"] # Keep pod running for testing
+
+      # ========================================================================
+      # METHOD 1: Environment Variables
+      # ========================================================================
+      env:
+        # Individual values from ConfigMap
+        - name: DATABASE_HOST # Name in the container
+          valueFrom:
+            configMapKeyRef:
+              name: app-config # ConfigMap name
+              key: DB_HOST # Key in ConfigMap
+
+        # Individual values from Secret
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets # Secret name
+              key: DB_PASSWORD # Key in Secret
+
+        # You can also set static values
+        - name: APP_NAME
+          value: "doit-api"
+
+      # Alternative: Load ALL keys from ConfigMap/Secret as env vars
+      envFrom:
+        - configMapRef:
+            name: app-config # All keys become env vars
+        - secretRef:
+            name: app-secrets # All keys become env vars
+
+      # ========================================================================
+      # METHOD 2: Mount as Files
+      # ========================================================================
+      volumeMounts:
+        # Mount ConfigMap as a directory
+        - name: config-volume
+          mountPath: /etc/config # ConfigMap keys become files here
+          readOnly: true
+
+        # Mount Secret as a directory
+        - name: secret-volume
+          mountPath: /etc/secrets # Secret keys become files here
+          readOnly: true
+
+  # Define the volumes
+  volumes:
+    - name: config-volume
+      configMap:
+        name: app-config # Reference the ConfigMap
+
+    - name: secret-volume
+      secret:
+        secretName: app-secrets # Reference the Secret
+
+# ============================================================================
+# WHAT THIS CREATES:
+# ============================================================================
+#
+# Environment Variables:
+#   DATABASE_HOST=postgres        (from ConfigMap, renamed)
+#   DATABASE_PASSWORD=doit123     (from Secret, renamed)
+#   APP_NAME=doit-api             (static value)
+#   DB_HOST=postgres              (from envFrom ConfigMap)
+#   DB_PORT=5432                  (from envFrom ConfigMap)
+#   DB_USER=doit                  (from envFrom Secret)
+#   ... etc
+#
+# Mounted Files:
+#   /etc/config/DB_HOST           (contains: postgres)
+#   /etc/config/DB_PORT           (contains: 5432)
+#   /etc/config/app.properties    (contains the multi-line config)
+#   /etc/secrets/DB_PASSWORD      (contains: doit123)
+#   /etc/secrets/JWT_SECRET       (contains: my-super-secret-jwt-key)
+#   ... etc
+#
+# ============================================================================
+
